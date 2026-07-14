@@ -1,0 +1,8 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/auth
+    username: auth
+    password: auth
+  flyway:
+    # 기존 스키마에도 이력 테이블을 세운다. 도메인별 로케이션·스키마는 Phase 1에서 배선한다.
+    baseline-on-migrate: true
