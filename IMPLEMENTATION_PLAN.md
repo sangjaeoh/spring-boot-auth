@@ -226,3 +226,24 @@ P1b의 최소 슬라이스를 정식 기능으로 확장한다.
 ## 착수 순서 요약
 
 P0(하네스, 타임박스 + 조달 병렬) → P1a(핫패스 MVP) → P1b(최소 로컬 온보딩, 단일 트랜잭션) → P2(소셜) → P3(디바이스·다중세션) → P4(본인인증 실·약관·탈퇴/보존·휴면) → P5(알림·레이트리밋·잠금) → P6(관리자·RBAC·감사) → P7(MFA 슬롯). 각 단계는 §3 표준 루프를 애그리거트에 적용하고 §4 검증으로 닫는다. §5 횡단 게이트(특히 Redis HA·PII 키/blind index)는 P1a 전 확정한다.
+
+## 진행 현황 (투두)
+
+세션마다 이 목록을 갱신한다. 각 단계는 설계 → 콜드 서브에이전트 설계 리뷰 → 구현 → 콜드 서브에이전트 코드 리뷰 → 타당한 반영 → 커밋·메인 머지 → 새 세션으로 진행한다. **다음 세션은 아래에서 첫 미완 항목을 이어서 진행한다.**
+
+- [x] **Phase 0** — 빌드 하네스 + walking skeleton (`./gradlew build` green)
+- [x] **Phase 1a (핵심 슬라이스)** — 인증 핫패스 E2E: 로그인 → O(1) 세션검증 → 로그아웃 즉시 401 → 리프레시 회전 + 유예 창 + 재사용 감지→패밀리 전멸. 신규 모듈 `domain-auth`·`infra-redis`(Lua 회전)·`infra-crypto`(Argon2id/SHA-256)·`common-auth`(Nimbus RS256 JWT)·`common-web`(Spring Security 필터)·`app-api`. throwaway `domain-skeleton` 제거. 28 테스트 green(Testcontainers PG+Redis + HTTP E2E + ArchUnit).
+  - **1a 내 남은 슬라이스(다음 착수)**: 비번 재설정(`initiateReset`/`completeReset` + `VerificationChallenge`) + 최근 N 재사용 금지(`password_history`) + 로그인 상태 비번변경 + Argon2 바운드 실행기·용량모델 + JWKS 엔드포인트/90일 회전 + Redis HA/failover 정합.
+- [ ] **Phase 1b** — 최소 로컬 온보딩(`RegistrationSession`·`VerificationChallenge`·최소 `Terms`/`Consent` 시드·Mock 본인인증·`CiRegistry`·`User`), `CreateUser` 단일 크로스스키마 트랜잭션. `usr` 스키마 등장 → `SchemaFlywayFactory`·PII envelope 암호화·전화 blind index 이 단계에서 배선.
+- [ ] **Phase 2** — 소셜 로그인 4종 + 연동/해제
+- [ ] **Phase 3** — 디바이스 + 다중 로그인 제한(동시 세션 ≤N·최오래 축출) + 강제/원격 로그아웃
+- [ ] **Phase 4** — 본인인증(실) + 약관·동의 + 탈퇴/보존 + 휴면
+- [ ] **Phase 5** — 이상탐지·알림 + 레이트리밋 + 계정 잠금(연속 실패 카운터→TEMP_LOCKED)
+- [ ] **Phase 6** — 관리자 콘솔 + RBAC + 감사
+- [ ] **Phase 7** — MFA(옵션, 슬롯만)
+
+### Phase 1a 확정된 구현 결정 (다음 세션 참고)
+- 세션 스토어 포트는 `domain-auth`가 선언하고 `infra-redis`가 Lua로 구현한다. `convention.infra-module`은 common-only 기본 + `infra-redis`에만 `domain-auth` 의존 허용(플랜 §1의 Redis 애그리거트 예외). crypto 포트는 `common-core.crypto`가 소유(infra-crypto는 common-only).
+- 리프레시 = 불투명 랜덤(256b) + 서버 역인덱스 `refidx:<jtiHash>→userId|sessionId`(sessionTtl). 세션 키는 `{u:userId}` 해시태그로 단일 슬롯. 회전은 슬라이딩 만료(키 TTL·`expiresAt` 필드·인덱스 TTL 정합).
+- Bean 배선: `app-api`가 `com.example.auth` 전체를 컴포넌트 스캔(+`@EntityScan`/`@EnableJpaRepositories`는 도메인 패키지). 도메인 서비스=`@Service`, infra/공용 설정=`@Component`/`@Configuration`.
+- SB4 모듈 분리 함정(다음 세션 재발): `@EntityScan`=`org.springframework.boot.persistence.autoconfigure`, `TestRestTemplate`=`spring-boot-resttestclient`(+`spring-boot-restclient` 필요, `@AutoConfigureTestRestTemplate`), Redis만 쓰는 IT는 `spring.autoconfigure.exclude`로 DataSource/JPA 오토컨피그 제외. bcprov는 BOM 미관리라 카탈로그 pin.

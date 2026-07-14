@@ -18,6 +18,11 @@ rootProject.name = "spring-boot-auth"
 // 모듈은 생성되는 대로 등록한다(module-{layer}/{prefix}-{name}).
 include(":module-common:common-core")
 include(":module-common:common-jpa")
-include(":module-domains:domain-skeleton")
+include(":module-common:common-auth")
+include(":module-common:common-web")
+include(":module-domains:domain-auth")
+include(":module-infra:infra-crypto")
+include(":module-infra:infra-redis")
+include(":module-apps:app-api")
 include(":module-apps:app-migration")
 include(":architecture-tests")

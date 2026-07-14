@@ -14,6 +14,11 @@ dependencies {
     // ArchUnit이 임포트·검사할 프로덕션 클래스.
     testImplementation(project(":module-common:common-core"))
     testImplementation(project(":module-common:common-jpa"))
-    testImplementation(project(":module-domains:domain-skeleton"))
+    testImplementation(project(":module-common:common-auth"))
+    testImplementation(project(":module-common:common-web"))
+    testImplementation(project(":module-domains:domain-auth"))
+    testImplementation(project(":module-infra:infra-crypto"))
+    testImplementation(project(":module-infra:infra-redis"))
+    testImplementation(project(":module-apps:app-api"))
     testImplementation(project(":module-apps:app-migration"))
 }
