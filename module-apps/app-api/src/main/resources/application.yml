@@ -16,3 +16,9 @@ spring:
     redis:
       host: localhost
       port: 6379
+
+auth:
+  jwt:
+    jwks:
+      # 유예 창 ≥ 2×Access TTL(15분). 회전된 키를 이 기간 검증·게시한 뒤 축출한다.
+      grace-minutes: 30
