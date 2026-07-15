@@ -2,6 +2,7 @@ package com.example.auth.app.api.facade;
 
 import static java.util.Objects.requireNonNull;
 
+import com.example.auth.app.api.presentation.v1.DeviceBindingRequest;
 import com.example.auth.app.api.presentation.v1.SocialLoginResponse;
 import com.example.auth.app.api.presentation.v1.SocialRegistrationCompleteResponse;
 import com.example.auth.app.api.presentation.v1.SocialRegistrationResponse;
@@ -18,12 +19,14 @@ import com.example.auth.domain.auth.event.SocialDisconnected;
 import com.example.auth.domain.auth.exception.AuthErrorCode;
 import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.info.LoginAccountInfo;
+import com.example.auth.domain.auth.info.RecognizedDeviceInfo;
 import com.example.auth.domain.auth.info.RegistrationCompletionInfo;
 import com.example.auth.domain.auth.info.SessionCreated;
 import com.example.auth.domain.auth.info.SocialAuthenticationInfo;
 import com.example.auth.domain.auth.info.SocialRegistrationStartedInfo;
 import com.example.auth.domain.auth.service.AccountRegistrationProcessor;
 import com.example.auth.domain.auth.service.AuthAccountReader;
+import com.example.auth.domain.auth.service.DeviceRecognitionService;
 import com.example.auth.domain.auth.service.LoginAttemptAppender;
 import com.example.auth.domain.auth.service.RegistrationSessionProcessor;
 import com.example.auth.domain.auth.service.SessionProcessor;
@@ -54,6 +57,7 @@ public class SocialAuthFacade {
     private final AccountRegistrationProcessor accountRegistrationProcessor;
     private final AuthAccountReader authAccountReader;
     private final LoginAttemptAppender loginAttemptAppender;
+    private final DeviceRecognitionService deviceRecognitionService;
     private final SessionProcessor sessionProcessor;
     private final JwtIssuer jwtIssuer;
     private final MessagePublisher messagePublisher;
@@ -65,6 +69,7 @@ public class SocialAuthFacade {
             AccountRegistrationProcessor accountRegistrationProcessor,
             AuthAccountReader authAccountReader,
             LoginAttemptAppender loginAttemptAppender,
+            DeviceRecognitionService deviceRecognitionService,
             SessionProcessor sessionProcessor,
             JwtIssuer jwtIssuer,
             MessagePublisher messagePublisher,
@@ -74,6 +79,7 @@ public class SocialAuthFacade {
         this.accountRegistrationProcessor = accountRegistrationProcessor;
         this.authAccountReader = authAccountReader;
         this.loginAttemptAppender = loginAttemptAppender;
+        this.deviceRecognitionService = deviceRecognitionService;
         this.sessionProcessor = sessionProcessor;
         this.jwtIssuer = jwtIssuer;
         this.messagePublisher = messagePublisher;
@@ -87,7 +93,12 @@ public class SocialAuthFacade {
      * @throws AuthException 토큰 검증 실패·차단 계정 시(사유 미구분 401), IdP가 이메일을 제공하지
      *     않으면(400)
      */
-    public SocialLoginResponse login(SocialProvider provider, String idToken, String ip, @Nullable String userAgent) {
+    public SocialLoginResponse login(
+            SocialProvider provider,
+            String idToken,
+            DeviceBindingRequest device,
+            String ip,
+            @Nullable String userAgent) {
         Instant now = Instant.now();
         SocialAuthenticationInfo identity = socialConnectionProcessor.authenticate(provider, idToken);
         UUID connectedUserId = identity.connectedUserId();
@@ -106,7 +117,7 @@ public class SocialAuthFacade {
         if (!account.loginAllowed()) {
             fail(account.userId(), requireNonNull(account.blockReason()), ip, now);
         }
-        return SocialLoginResponse.loggedIn(issueSession(account.userId(), ip, userAgent, now));
+        return SocialLoginResponse.loggedIn(issueSession(account.userId(), device, ip, userAgent, now));
     }
 
     /**
@@ -114,14 +125,18 @@ public class SocialAuthFacade {
      * (비밀번호 없는 계정), 성공 후 세션(멱등키)을 소비하고 로그인 세션을 발급한다.
      */
     public SocialRegistrationCompleteResponse completeRegistration(
-            UUID registrationId, String onboardingToken, String ip, @Nullable String userAgent) {
+            UUID registrationId,
+            String onboardingToken,
+            DeviceBindingRequest device,
+            String ip,
+            @Nullable String userAgent) {
         Instant now = Instant.now();
         RegistrationCompletionInfo completion = registrationSessionProcessor.complete(registrationId, onboardingToken);
         UUID userId = accountRegistrationProcessor.registerSocial(completion);
         registrationSessionProcessor.consume(registrationId);
         messagePublisher.publish(
                 new SocialConnected(userId, requireNonNull(completion.social()).provider(), now));
-        TokenResponse tokens = issueSession(userId, ip, userAgent, now);
+        TokenResponse tokens = issueSession(userId, device, ip, userAgent, now);
         return new SocialRegistrationCompleteResponse(
                 userId, tokens.accessToken(), tokens.refreshToken(), tokens.expiresInSeconds());
     }
@@ -142,9 +157,12 @@ public class SocialAuthFacade {
         messagePublisher.publish(new SocialDisconnected(userId, provider, Instant.now()));
     }
 
-    private TokenResponse issueSession(UUID userId, String ip, @Nullable String userAgent, Instant now) {
-        SessionCreated session = sessionProcessor.createSession(userId, null, ip, userAgent, now);
-        loginAttemptAppender.record(userId, LoginResult.SUCCESS, null, ip, null, 0, now);
+    private TokenResponse issueSession(
+            UUID userId, DeviceBindingRequest device, String ip, @Nullable String userAgent, Instant now) {
+        RecognizedDeviceInfo recognized = deviceRecognitionService.recognize(
+                userId, device.fingerprint(), device.deviceName(), device.platform(), ip, now);
+        SessionCreated session = sessionProcessor.createSession(userId, recognized.deviceId(), ip, userAgent, now);
+        loginAttemptAppender.record(userId, LoginResult.SUCCESS, null, ip, recognized.deviceId(), 0, now);
         messagePublisher.publish(new LoggedIn(userId, session.sessionId(), now));
         String accessToken = jwtIssuer.issueAccess(userId, session.sessionId(), DEFAULT_ROLES, accessTtl, now);
         return new TokenResponse(accessToken, session.refreshToken(), accessTtl.toSeconds());

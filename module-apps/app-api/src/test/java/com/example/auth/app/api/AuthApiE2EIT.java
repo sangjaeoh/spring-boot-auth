@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.auth.app.api.facade.AccountProvisioningFacade;
+import com.example.auth.app.api.presentation.v1.DeviceBindingRequestFixture;
 import com.example.auth.app.api.presentation.v1.LoginRequest;
 import com.example.auth.app.api.presentation.v1.MeResponse;
 import com.example.auth.app.api.presentation.v1.RefreshRequest;
@@ -88,8 +89,10 @@ class AuthApiE2EIT {
     void wrongPasswordIsRejected() {
         provisioning.provision("bob@example.com", "secret123");
 
-        ResponseEntity<String> response =
-                rest.postForEntity("/auth/login", new LoginRequest("bob@example.com", "wrongpass1"), String.class);
+        ResponseEntity<String> response = rest.postForEntity(
+                "/auth/login",
+                new LoginRequest("bob@example.com", "wrongpass1", DeviceBindingRequestFixture.webDevice()),
+                String.class);
 
         assertThat(response.getStatusCode().value()).isEqualTo(401);
     }
@@ -153,8 +156,10 @@ class AuthApiE2EIT {
     }
 
     private TokenResponse login(String email, String password) {
-        ResponseEntity<TokenResponse> response =
-                rest.postForEntity("/auth/login", new LoginRequest(email, password), TokenResponse.class);
+        ResponseEntity<TokenResponse> response = rest.postForEntity(
+                "/auth/login",
+                new LoginRequest(email, password, DeviceBindingRequestFixture.webDevice()),
+                TokenResponse.class);
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         return requireNonNull(response.getBody());
     }
