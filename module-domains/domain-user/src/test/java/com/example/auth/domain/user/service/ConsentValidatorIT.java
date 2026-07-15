@@ -67,12 +67,12 @@ class ConsentValidatorIT {
 
     @Test
     void rejectsTypeWithoutAnyEffectiveVersion() {
-        // MARKETING은 시드에 없다 — 발효 버전이 없는 유형에 대한 동의는 버전 불일치로 거부된다.
+        // THIRD_PARTY는 시드에 없다 — 발효 버전이 없는 유형에 대한 동의는 버전 불일치로 거부된다.
         assertThatThrownBy(() -> validator.validateForSignup(Map.of(
                         TermsType.SERVICE, 1,
                         TermsType.PRIVACY_REQUIRED, 1,
                         TermsType.AGE14, 1,
-                        TermsType.MARKETING, 1)))
+                        TermsType.THIRD_PARTY, 1)))
                 .isInstanceOf(UserException.class)
                 .satisfies(e ->
                         assertThat(((UserException) e).getErrorCode()).isEqualTo(UserErrorCode.TERMS_VERSION_INVALID));

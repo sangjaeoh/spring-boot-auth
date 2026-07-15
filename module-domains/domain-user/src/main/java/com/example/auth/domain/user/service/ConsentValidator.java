@@ -32,6 +32,19 @@ public class ConsentValidator {
     }
 
     /**
+     * 동의 대상 버전이 해당 유형의 현행 발효 버전임을 검증한다(이용 중 동의·재동의 공통 규칙).
+     *
+     * @throws UserException 현행 버전 불일치·미지 유형이면 {@code TERMS_VERSION_INVALID}(400)
+     */
+    @Transactional(readOnly = true)
+    public void validateCurrentVersion(TermsType termsType, int version) {
+        Integer currentVersion = currentVersionsByType(Instant.now()).get(termsType);
+        if (currentVersion == null || currentVersion != version) {
+            throw new UserException(UserErrorCode.TERMS_VERSION_INVALID);
+        }
+    }
+
+    /**
      * 동의 선택값이 (1) 전부 현행 발효 버전과 일치하고 (2) 필수 약관을 전부 포함함을 검증한다.
      *
      * @param agreed 동의한 (약관 유형 → 버전)
