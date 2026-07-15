@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":module-infra:infra-redis"))
     implementation(project(":module-external:external-identity"))
     implementation(project(":module-external:external-notification"))
+    implementation(project(":module-external:external-social"))
     implementation(project(":module-common:common-auth"))
     implementation(project(":module-common:common-web"))
 

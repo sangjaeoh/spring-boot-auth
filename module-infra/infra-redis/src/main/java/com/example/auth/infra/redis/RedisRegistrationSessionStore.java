@@ -3,10 +3,12 @@ package com.example.auth.infra.redis;
 import com.example.auth.domain.auth.entity.ConsentSelection;
 import com.example.auth.domain.auth.entity.RegistrationStep;
 import com.example.auth.domain.auth.entity.RegistrationType;
+import com.example.auth.domain.auth.entity.SocialProvider;
 import com.example.auth.domain.auth.exception.AuthErrorCode;
 import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.port.RegistrationSessionStore;
 import com.example.auth.domain.auth.port.RegistrationSnapshot;
+import com.example.auth.domain.auth.port.SocialRegistrationContext;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -49,6 +51,9 @@ public class RedisRegistrationSessionStore implements RegistrationSessionStore {
     private static final String FIELD_VERIFICATION_REF = "verificationRef";
     private static final String FIELD_CI_HASH = "ciHash";
     private static final String FIELD_CONSENTS = "consents";
+    private static final String FIELD_SOCIAL_PROVIDER = "socialProvider";
+    private static final String FIELD_SOCIAL_SUBJECT = "socialSubject";
+    private static final String FIELD_SOCIAL_EMAIL_RELAY = "socialEmailRelay";
     private static final String MARKED = "1";
 
     private final StringRedisTemplate redis;
@@ -79,6 +84,32 @@ public class RedisRegistrationSessionStore implements RegistrationSessionStore {
                     loginEmail);
         } catch (DataAccessException e) {
             log.warn("온보딩 세션 생성 중 Redis 예외 — fail-closed(503)", e);
+            throw new AuthException(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
+        }
+    }
+
+    @Override
+    public void createSocial(
+            UUID registrationId, String tokenHash, String loginEmail, SocialRegistrationContext social, Duration ttl) {
+        try {
+            redis.execute(
+                    createScript,
+                    List.of(registrationKey(registrationId)),
+                    Long.toString(ttl.toMillis()),
+                    FIELD_TYPE,
+                    RegistrationType.SOCIAL.name(),
+                    FIELD_TOKEN_HASH,
+                    tokenHash,
+                    FIELD_LOGIN_EMAIL,
+                    loginEmail,
+                    FIELD_SOCIAL_PROVIDER,
+                    social.provider().name(),
+                    FIELD_SOCIAL_SUBJECT,
+                    social.providerUserId(),
+                    FIELD_SOCIAL_EMAIL_RELAY,
+                    social.privateRelayEmail() ? MARKED : "0");
+        } catch (DataAccessException e) {
+            log.warn("소셜 온보딩 세션 생성 중 Redis 예외 — fail-closed(503)", e);
             throw new AuthException(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
         }
     }
@@ -180,7 +211,19 @@ public class RedisRegistrationSessionStore implements RegistrationSessionStore {
                 fields.get(FIELD_PHONE_CHALLENGE_ID),
                 verificationRef == null ? null : UUID.fromString(verificationRef),
                 fields.get(FIELD_CI_HASH),
-                parseConsents(fields.get(FIELD_CONSENTS)));
+                parseConsents(fields.get(FIELD_CONSENTS)),
+                toSocialContext(fields));
+    }
+
+    private static @Nullable SocialRegistrationContext toSocialContext(Map<String, String> fields) {
+        String provider = fields.get(FIELD_SOCIAL_PROVIDER);
+        if (provider == null) {
+            return null;
+        }
+        return new SocialRegistrationContext(
+                SocialProvider.valueOf(provider),
+                requireField(fields, FIELD_SOCIAL_SUBJECT),
+                MARKED.equals(fields.get(FIELD_SOCIAL_EMAIL_RELAY)));
     }
 
     private static String requireField(Map<String, String> fields, String field) {

@@ -40,7 +40,9 @@ public class SecurityConfig {
                                 "/auth/token/refresh",
                                 "/auth/password/reset/initiate",
                                 "/auth/password/reset/complete",
-                                "/auth/registration/**")
+                                "/auth/registration/**",
+                                "/auth/social/login",
+                                "/auth/social/registration/complete")
                         .permitAll()
                         .anyRequest()
                         .authenticated())

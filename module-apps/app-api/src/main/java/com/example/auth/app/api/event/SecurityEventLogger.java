@@ -7,6 +7,8 @@ import com.example.auth.domain.auth.event.PasswordResetCompleted;
 import com.example.auth.domain.auth.event.PasswordResetRequested;
 import com.example.auth.domain.auth.event.RefreshReuseDetected;
 import com.example.auth.domain.auth.event.SessionRevoked;
+import com.example.auth.domain.auth.event.SocialConnected;
+import com.example.auth.domain.auth.event.SocialDisconnected;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -53,5 +55,15 @@ public class SecurityEventLogger {
     @EventListener
     public void onPasswordChanged(PasswordChanged event) {
         log.info("비밀번호 변경 userId={}", event.userId());
+    }
+
+    @EventListener
+    public void onSocialConnected(SocialConnected event) {
+        log.info("소셜 연동 userId={} provider={}", event.userId(), event.provider());
+    }
+
+    @EventListener
+    public void onSocialDisconnected(SocialDisconnected event) {
+        log.info("소셜 연동 해제 userId={} provider={}", event.userId(), event.provider());
     }
 }

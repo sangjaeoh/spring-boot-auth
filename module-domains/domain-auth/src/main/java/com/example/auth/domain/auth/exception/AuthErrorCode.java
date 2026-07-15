@@ -20,6 +20,12 @@ public enum AuthErrorCode implements ErrorCode {
     REGISTRATION_STEP_INCOMPLETE("AUTH_REGISTRATION_STEP_INCOMPLETE", "가입에 필요한 인증 절차가 완료되지 않았습니다.", 409),
     REFRESH_TOKEN_INVALID("AUTH_REFRESH_INVALID", "유효하지 않은 리프레시 토큰입니다.", 401),
     REFRESH_TOKEN_REUSE("AUTH_REFRESH_REUSE", "보안을 위해 세션이 종료되었습니다. 다시 로그인해 주세요.", 401),
+    SOCIAL_TOKEN_INVALID("AUTH_SOCIAL_TOKEN_INVALID", "소셜 인증에 실패했습니다.", 401),
+    SOCIAL_EMAIL_REQUIRED("AUTH_SOCIAL_EMAIL_REQUIRED", "소셜 계정에서 이메일을 확인할 수 없습니다. 이메일 제공에 동의해 주세요.", 400),
+    SOCIAL_ALREADY_CONNECTED("AUTH_SOCIAL_ALREADY_CONNECTED", "이미 다른 계정에 연결된 소셜 계정입니다.", 409),
+    SOCIAL_PROVIDER_ALREADY_LINKED("AUTH_SOCIAL_PROVIDER_ALREADY_LINKED", "이미 연동된 소셜 제공자입니다.", 409),
+    SOCIAL_CONNECTION_NOT_FOUND("AUTH_SOCIAL_CONNECTION_NOT_FOUND", "연동된 소셜 계정이 없습니다.", 404),
+    LAST_LOGIN_METHOD("AUTH_LAST_LOGIN_METHOD", "마지막 로그인 수단은 해제할 수 없습니다.", 409),
     SESSION_STORE_UNAVAILABLE("AUTH_SESSION_STORE_UNAVAILABLE", "일시적으로 세션 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.", 503);
 
     private final String code;
