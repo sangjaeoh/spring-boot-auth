@@ -1,5 +1,6 @@
 package com.example.auth.domain.user.service;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -11,6 +12,7 @@ import com.example.auth.domain.user.entity.CiRegistry;
 import com.example.auth.domain.user.entity.Gender;
 import com.example.auth.domain.user.entity.IdentityVerification;
 import com.example.auth.domain.user.entity.Provider;
+import com.example.auth.domain.user.entity.VerificationResult;
 import com.example.auth.domain.user.entity.VerificationStatus;
 import com.example.auth.domain.user.exception.UserErrorCode;
 import com.example.auth.domain.user.exception.UserException;
@@ -52,8 +54,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 class IdentityVerificationProcessorIT {
 
-    private static final IdentityProviderRequest REQUEST =
-            new IdentityProviderRequest("홍길동", LocalDate.of(1990, 3, 14), Gender.MALE, Carrier.SKT, "+821012345678");
+    // 테스트마다 고유 정체성(전화)을 쓴다 — 컨텍스트·데이터가 공유되므로 동일 정체성(=동일 ciHash)은
+    // 실행 순서에 따라 CI 중복 판정이 교차 오염된다(JUnit은 메서드 순서를 보증하지 않는다).
+    private static IdentityProviderRequest request(String phone) {
+        return new IdentityProviderRequest("홍길동", LocalDate.of(1990, 3, 14), Gender.MALE, Carrier.SKT, phone);
+    }
 
     @Container
     @ServiceConnection
@@ -77,7 +82,8 @@ class IdentityVerificationProcessorIT {
 
     @Test
     void verifiesAndStoresEncryptedResultWithDerivedCiHash() {
-        IdentityVerifiedInfo info = processor.verify(REQUEST);
+        IdentityProviderRequest request = request("+821011110001");
+        IdentityVerifiedInfo info = processor.verify(request);
 
         assertThat(info.ciHash()).startsWith("1:");
 
@@ -86,45 +92,59 @@ class IdentityVerificationProcessorIT {
         assertThat(stored.getStatus()).isEqualTo(VerificationStatus.VERIFIED);
         assertThat(stored.getUserId()).isNull();
 
+        // 복호 왕복 — 로드된 결과 VO가 원문을 복원한다.
+        VerificationResult result = requireNonNull(stored.getResult());
+        assertThat(result.name()).isEqualTo("홍길동");
+        assertThat(result.birthDate()).isEqualTo(LocalDate.of(1990, 3, 14));
+        assertThat(result.phone()).isEqualTo("+821011110001");
+
         // PII 컬럼은 컨버터 출력(암호화 배선)과 정확히 일치하고 원문이 그대로 있지 않다.
         Map<String, Object> row = jdbc.queryForMap(
                 "select name, birth_date, phone, di, ci_hash from usr.identity_verification where id = ?",
                 info.verificationId());
         assertThat(row.get("name")).isEqualTo(TestBeans.FAKE_CIPHER.encrypt("홍길동"));
         assertThat(row.get("birth_date")).isEqualTo(TestBeans.FAKE_CIPHER.encrypt("1990-03-14"));
-        assertThat(row.get("phone")).isEqualTo(TestBeans.FAKE_CIPHER.encrypt("+821012345678"));
+        assertThat(row.get("phone")).isEqualTo(TestBeans.FAKE_CIPHER.encrypt("+821011110001"));
         assertThat((String) row.get("name")).doesNotContain("홍길동");
         assertThat((String) row.get("di")).isNotEmpty();
         assertThat(row.get("ci_hash")).isEqualTo(info.ciHash());
 
         // 동일인 재시도는 동일 ciHash(결정적 CI 파생) — CI 원장 유일성 시맨틱의 전제.
-        assertThat(processor.verify(REQUEST).ciHash()).isEqualTo(info.ciHash());
+        assertThat(processor.verify(request).ciHash()).isEqualTo(info.ciHash());
     }
 
     @Test
     void rejectsWhenCiAlreadyLinkedToActiveUser() {
-        IdentityVerifiedInfo first = processor.verify(REQUEST);
+        IdentityProviderRequest request = request("+821011110002");
+        IdentityVerifiedInfo first = processor.verify(request);
         ciRegistryRepository.save(CiRegistry.link(first.ciHash(), UUID.randomUUID(), Instant.now()));
 
-        assertThatThrownBy(() -> processor.verify(REQUEST))
+        assertThatThrownBy(() -> processor.verify(request))
                 .isInstanceOf(UserException.class)
                 .satisfies(e -> assertThat(((UserException) e).getErrorCode()).isEqualTo(UserErrorCode.DUPLICATE_CI));
 
         // soft-check 거부여도 수행된 실명확인(VERIFIED)은 감사 사실로 남는다.
         long verifiedCount = verificationRepository.findAll().stream()
                 .filter(v -> v.getStatus() == VerificationStatus.VERIFIED)
+                .filter(v -> first.ciHash()
+                        .equals(v.getResult() == null ? null : v.getResult().ciHash()))
                 .count();
-        assertThat(verifiedCount).isGreaterThanOrEqualTo(2);
+        assertThat(verifiedCount).isEqualTo(2);
     }
 
     @Test
     void failedOutcomeTransitionsToFailedAndThrows() {
-        assertThatThrownBy(() -> failingProcessor.verify(REQUEST))
+        assertThatThrownBy(() -> failingProcessor.verify(request("+821011110003")))
                 .isInstanceOf(UserException.class)
                 .satisfies(e -> assertThat(((UserException) e).getErrorCode())
                         .isEqualTo(UserErrorCode.IDENTITY_VERIFICATION_FAILED));
 
-        assertThat(verificationRepository.findAll()).anyMatch(v -> v.getStatus() == VerificationStatus.FAILED);
+        // FAILED 행은 결과 없이 남는다(embedded 전 컬럼 null → null 로드).
+        IdentityVerification failed = verificationRepository.findAll().stream()
+                .filter(v -> v.getStatus() == VerificationStatus.FAILED)
+                .findFirst()
+                .orElseThrow();
+        assertThat(failed.getResult()).isNull();
     }
 
     /**

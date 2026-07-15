@@ -19,15 +19,10 @@ import java.util.UUID;
 public interface RegistrationSessionStore {
 
     /**
-     * 온보딩 세션을 저장하고 TTL을 건다. {@code emailChallengeId}는 시작 시 발급된 이메일 챌린지 바인딩이다.
+     * 온보딩 세션을 저장하고 TTL을 원자적으로 건다(TTL 없는 키가 잔존하는 중간 상태 금지). 챌린지
+     * 바인딩은 발급 시점에 {@code attach*}로 채운다.
      */
-    void create(
-            UUID registrationId,
-            RegistrationType type,
-            String tokenHash,
-            String loginEmail,
-            String emailChallengeId,
-            Duration ttl);
+    void create(UUID registrationId, RegistrationType type, String tokenHash, String loginEmail, Duration ttl);
 
     /**
      * 세션 스냅샷을 반환한다. 부재·만료면 empty.

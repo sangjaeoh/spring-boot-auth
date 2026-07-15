@@ -52,35 +52,31 @@ public class RedisRegistrationSessionStore implements RegistrationSessionStore {
     private static final String MARKED = "1";
 
     private final StringRedisTemplate redis;
+    private final RedisScript<Long> createScript;
     private final RedisScript<Long> markScript;
 
     public RedisRegistrationSessionStore(
-            StringRedisTemplate redis, @Qualifier("markRegistrationScript") RedisScript<Long> markRegistrationScript) {
+            StringRedisTemplate redis,
+            @Qualifier("createRegistrationScript") RedisScript<Long> createRegistrationScript,
+            @Qualifier("markRegistrationScript") RedisScript<Long> markRegistrationScript) {
         this.redis = redis;
+        this.createScript = createRegistrationScript;
         this.markScript = markRegistrationScript;
     }
 
     @Override
-    public void create(
-            UUID registrationId,
-            RegistrationType type,
-            String tokenHash,
-            String loginEmail,
-            String emailChallengeId,
-            Duration ttl) {
-        String key = registrationKey(registrationId);
-        Map<String, String> fields = Map.of(
-                FIELD_TYPE,
-                type.name(),
-                FIELD_TOKEN_HASH,
-                tokenHash,
-                FIELD_LOGIN_EMAIL,
-                loginEmail,
-                FIELD_EMAIL_CHALLENGE_ID,
-                emailChallengeId);
+    public void create(UUID registrationId, RegistrationType type, String tokenHash, String loginEmail, Duration ttl) {
         try {
-            redis.<String, String>opsForHash().putAll(key, fields);
-            redis.expire(key, ttl);
+            redis.execute(
+                    createScript,
+                    List.of(registrationKey(registrationId)),
+                    Long.toString(ttl.toMillis()),
+                    FIELD_TYPE,
+                    type.name(),
+                    FIELD_TOKEN_HASH,
+                    tokenHash,
+                    FIELD_LOGIN_EMAIL,
+                    loginEmail);
         } catch (DataAccessException e) {
             log.warn("온보딩 세션 생성 중 Redis 예외 — fail-closed(503)", e);
             throw new AuthException(AuthErrorCode.SESSION_STORE_UNAVAILABLE);

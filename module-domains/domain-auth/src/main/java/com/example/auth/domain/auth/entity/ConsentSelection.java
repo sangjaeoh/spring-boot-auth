@@ -10,8 +10,9 @@ package com.example.auth.domain.auth.entity;
 public record ConsentSelection(String termsType, int termsVersion) {
 
     public ConsentSelection {
-        if (termsType.isBlank()) {
-            throw new IllegalArgumentException("termsType은 비어 있을 수 없습니다.");
+        // 구분자 금지는 스토어 직렬화("TYPE:v,TYPE:v")의 왕복 불변식이다(현 writer는 enum name이라 안전).
+        if (termsType.isBlank() || termsType.contains(":") || termsType.contains(",")) {
+            throw new IllegalArgumentException("termsType이 비어 있거나 허용되지 않는 문자를 포함합니다.");
         }
     }
 }

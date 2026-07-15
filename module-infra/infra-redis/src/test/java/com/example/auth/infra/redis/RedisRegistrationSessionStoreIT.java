@@ -49,18 +49,21 @@ class RedisRegistrationSessionStoreIT {
     @Test
     void createFindRoundTripAndTtlIsSet() {
         UUID id = UUID.randomUUID();
-        store.create(id, RegistrationType.LOCAL, "token-hash", "a@example.com", "chal-email-1", TTL);
+        store.create(id, RegistrationType.LOCAL, "token-hash", "a@example.com", TTL);
 
         RegistrationSnapshot snapshot = store.find(id).orElseThrow();
         assertThat(snapshot.type()).isEqualTo(RegistrationType.LOCAL);
         assertThat(snapshot.tokenHash()).isEqualTo("token-hash");
         assertThat(snapshot.loginEmail()).isEqualTo("a@example.com");
-        assertThat(snapshot.emailChallengeId()).isEqualTo("chal-email-1");
+        assertThat(snapshot.emailChallengeId()).isNull();
         assertThat(snapshot.phoneChallengeId()).isNull();
         assertThat(snapshot.completedSteps()).isEmpty();
         assertThat(snapshot.consents()).isEmpty();
 
-        // TTL이 실제로 걸렸다(만료 시 자동 파기의 전제).
+        assertThat(store.attachEmailChallenge(id, "chal-email-1")).isTrue();
+        assertThat(store.find(id).orElseThrow().emailChallengeId()).isEqualTo("chal-email-1");
+
+        // TTL이 생성과 원자적으로 걸렸다(만료 시 자동 파기의 전제 — TTL 없는 키 잔존 금지).
         Long expire = redisTemplate.getExpire("reg:" + id, TimeUnit.SECONDS);
         assertThat(expire).isPositive().isLessThanOrEqualTo(TTL.toSeconds());
     }
@@ -69,7 +72,7 @@ class RedisRegistrationSessionStoreIT {
     void marksStepsAndBuffersReferences() {
         UUID id = UUID.randomUUID();
         UUID verificationRef = UUID.randomUUID();
-        store.create(id, RegistrationType.LOCAL, "token-hash", "b@example.com", "chal-1", TTL);
+        store.create(id, RegistrationType.LOCAL, "token-hash", "b@example.com", TTL);
 
         assertThat(store.markEmailVerified(id)).isTrue();
         assertThat(store.attachPhoneChallenge(id, "chal-sms-1")).isTrue();
@@ -96,7 +99,7 @@ class RedisRegistrationSessionStoreIT {
     @Test
     void expiredSessionIsGoneAndMarkingDoesNotResurrectIt() {
         UUID id = UUID.randomUUID();
-        store.create(id, RegistrationType.LOCAL, "token-hash", "c@example.com", "chal-1", Duration.ofSeconds(1));
+        store.create(id, RegistrationType.LOCAL, "token-hash", "c@example.com", Duration.ofSeconds(1));
 
         await().atMost(Duration.ofSeconds(5))
                 .untilAsserted(() -> assertThat(store.find(id)).isEmpty());

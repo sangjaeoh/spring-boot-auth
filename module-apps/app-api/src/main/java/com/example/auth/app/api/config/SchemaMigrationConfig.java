@@ -22,16 +22,22 @@ import org.springframework.context.annotation.Configuration;
 public class SchemaMigrationConfig {
 
     /**
+     * 마이그레이션 완료를 나타내는 순서 마커다(범용 {@code List<String>} 빈은 컬렉션 주입 의미론과 겹친다).
+     */
+    public record MigratedSchemas(List<String> schemas) {}
+
+    /**
      * 설정된 스키마들을 마이그레이션하고 그 목록을 반환한다(EMF가 dependsOn하는 순서 마커).
      */
     @Bean
-    public List<String> migratedSchemas(DataSource dataSource, @Value("${app.migration.schemas}") String schemasCsv) {
+    public MigratedSchemas migratedSchemas(
+            DataSource dataSource, @Value("${app.migration.schemas}") String schemasCsv) {
         List<String> schemas = Arrays.stream(schemasCsv.split(",", -1))
                 .map(String::trim)
                 .filter(schema -> !schema.isEmpty())
                 .toList();
         SchemaFlywayFactory.migrateAll(dataSource, schemas);
-        return schemas;
+        return new MigratedSchemas(schemas);
     }
 
     /**

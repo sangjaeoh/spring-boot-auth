@@ -69,14 +69,10 @@ public class RegistrationSessionProcessor {
         String email = Email.of(loginEmail).value();
         UUID registrationId = UuidV7Generator.generate();
         String onboardingToken = generateToken();
+        // 세션 저장 후 발송(1a 챌린지와 동일 순서) — 저장 실패 시 세션 없는 코드 메일이 나가지 않는다.
+        store.create(registrationId, RegistrationType.LOCAL, tokenHasher.hash(onboardingToken), email, sessionTtl);
         String emailChallengeId = challengeProcessor.issue(registrationId, NotificationChannel.EMAIL, email);
-        store.create(
-                registrationId,
-                RegistrationType.LOCAL,
-                tokenHasher.hash(onboardingToken),
-                email,
-                emailChallengeId,
-                sessionTtl);
+        requireAlive(store.attachEmailChallenge(registrationId, emailChallengeId));
         return new RegistrationStartedInfo(registrationId, onboardingToken, emailChallengeId, sessionTtl.toSeconds());
     }
 

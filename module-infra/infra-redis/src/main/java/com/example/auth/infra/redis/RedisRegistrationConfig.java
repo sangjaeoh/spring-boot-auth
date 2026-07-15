@@ -13,6 +13,17 @@ import org.springframework.data.redis.core.script.RedisScript;
 public class RedisRegistrationConfig {
 
     /**
+     * 온보딩 세션 생성(HSET+PEXPIRE 원자화) Lua 스크립트를 로드한다.
+     */
+    @Bean
+    public RedisScript<Long> createRegistrationScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setLocation(new ClassPathResource("redis/create_registration.lua"));
+        script.setResultType(Long.class);
+        return script;
+    }
+
+    /**
      * 온보딩 세션 스텝 마킹(EXISTS 가드) Lua 스크립트를 로드한다.
      */
     @Bean
