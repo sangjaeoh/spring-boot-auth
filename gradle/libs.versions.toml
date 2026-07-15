@@ -41,6 +41,8 @@ spring-security-oauth2-jose = { module = "org.springframework.security:spring-se
 spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
 # infra 모듈이 Spring 스테레오타입(@Component·@Value)만 쓸 때의 최소 의존(autoconfigure 없이).
 spring-context = { module = "org.springframework:spring-context" }
+# RestClient 등 HTTP 클라이언트만 필요한 모듈의 최소 의존(웹서버 스타터 없이, 버전은 BOM).
+spring-web = { module = "org.springframework:spring-web" }
 # @ConditionalOnProperty 등 조건부 빈 등록만 필요한 모듈의 최소 의존(스타터 없이, 버전은 BOM).
 spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure" }
 # slf4j API(버전은 BOM). 스타터를 끌지 않는 모듈이 로깅할 때 컴파일 클래스패스에 명시한다.

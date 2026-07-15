@@ -43,8 +43,12 @@ app:
 
 user:
   identity-verification:
-    # 본인인증 진행 만료(expiresAt 계산). EXPIRED 스윕은 P4 — 그 전까지는 기준 시각 기록만.
+    # 본인인증 진행 만료(expiresAt 계산). 경과분은 app-batch EXPIRED 스윕이 수렴한다.
     ttl-minutes: 10
+    # 본인인증 어댑터: mock(오프라인 dev/test) | nice(실 기관). 조달(계약·사이트코드) 완료 시 nice로
+    # 전환하고 user.identity-verification.nice.{site-code,client-id,client-secret}를 주입한다
+    # (미주입 기동은 fail-fast). 전환은 설정만으로 이뤄진다 — 도메인 무변경.
+    mode: mock
 
 auth:
   session:
