@@ -85,6 +85,16 @@ public class AuthFacade {
         }
         LoginAccountInfo account = found.orElseThrow();
         if (!account.loginAllowed()) {
+            if (account.dormant()) {
+                // 휴면 안내는 자격 검증 성공자에게만 노출한다(열거 저항 — 실 KDF 1회로 타이밍 동일).
+                if (passwordCredentialReader.verify(account.userId(), rawPassword)) {
+                    loginAttemptAppender.record(
+                            account.userId(), LoginResult.FAILURE, FailureReason.NOT_ACTIVE, ip, null, 0, now);
+                    messagePublisher.publish(new LoginFailed(account.userId(), FailureReason.NOT_ACTIVE, now));
+                    throw new AuthException(AuthErrorCode.ACCOUNT_DORMANT);
+                }
+                fail(account.userId(), FailureReason.BAD_CREDENTIAL, ip, now);
+            }
             // 차단 계정도 KDF 1회를 태워 미존재·비번오류 경로와 응답 타이밍을 맞춘다(열거 저항).
             passwordCredentialReader.verifyAbsent(rawPassword);
             fail(account.userId(), requireNonNull(account.blockReason()), ip, now);

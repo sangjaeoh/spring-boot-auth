@@ -5,6 +5,7 @@ import com.example.auth.domain.user.entity.User;
 import com.example.auth.domain.user.exception.UserErrorCode;
 import com.example.auth.domain.user.exception.UserException;
 import com.example.auth.domain.user.repository.UserRepository;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,15 @@ public class UserModifier {
     public void changeContactEmail(UUID userId, String newEmail) {
         User user = getUser(userId);
         user.changeContactEmail(Email.of(newEmail));
+    }
+
+    /**
+     * 로그인 관측을 반영한다({@code LastLoginObserved} 소비 — 휴면 판정 기산점 갱신·사전통지 리셋).
+     * 미존재 회원은 무시한다(at-least-once 재전달의 안전 흡수).
+     */
+    @Transactional
+    public void recordLogin(UUID userId, Instant at) {
+        repository.findById(userId).ifPresent(user -> user.recordLogin(at));
     }
 
     private User getUser(UUID userId) {
