@@ -17,6 +17,7 @@ import com.example.auth.domain.auth.info.RecognizedDeviceInfo;
 import com.example.auth.domain.auth.info.RiskAssessmentInfo;
 import com.example.auth.domain.auth.info.RotationOutcome;
 import com.example.auth.domain.auth.info.SessionCreated;
+import com.example.auth.domain.auth.service.AccountLockProcessor;
 import com.example.auth.domain.auth.service.AuthAccountReader;
 import com.example.auth.domain.auth.service.DeviceRecognitionService;
 import com.example.auth.domain.auth.service.LoginAttemptAppender;
@@ -45,6 +46,7 @@ public class AuthFacade {
     private static final List<String> DEFAULT_ROLES = List.of("USER");
 
     private final AuthAccountReader authAccountReader;
+    private final AccountLockProcessor accountLockProcessor;
     private final RateLimitPolicyValidator rateLimitPolicyValidator;
     private final PasswordCredentialReader passwordCredentialReader;
     private final LoginAttemptAppender loginAttemptAppender;
@@ -57,6 +59,7 @@ public class AuthFacade {
 
     public AuthFacade(
             AuthAccountReader authAccountReader,
+            AccountLockProcessor accountLockProcessor,
             RateLimitPolicyValidator rateLimitPolicyValidator,
             PasswordCredentialReader passwordCredentialReader,
             LoginAttemptAppender loginAttemptAppender,
@@ -67,6 +70,7 @@ public class AuthFacade {
             MessagePublisher messagePublisher,
             @Value("${auth.access.ttl-minutes:15}") int accessTtlMinutes) {
         this.authAccountReader = authAccountReader;
+        this.accountLockProcessor = accountLockProcessor;
         this.rateLimitPolicyValidator = rateLimitPolicyValidator;
         this.passwordCredentialReader = passwordCredentialReader;
         this.loginAttemptAppender = loginAttemptAppender;
@@ -94,6 +98,12 @@ public class AuthFacade {
             fail(null, FailureReason.BAD_CREDENTIAL, ip, now);
         }
         LoginAccountInfo account = found.orElseThrow();
+        // 쿨다운이 경과한 일시 잠금은 판정 직전에 해제한다(lazy — 스케줄러 없이 전이가 수렴).
+        if (!account.loginAllowed()
+                && account.blockReason() == FailureReason.LOCKED
+                && accountLockProcessor.releaseIfCooldownElapsed(account.userId(), now)) {
+            account = authAccountReader.findForLogin(email).orElseThrow();
+        }
         if (!account.loginAllowed()) {
             if (account.dormant()) {
                 // 휴면 안내는 자격 검증 성공자에게만 노출한다(열거 저항 — 실 KDF 1회로 타이밍 동일).
@@ -112,6 +122,7 @@ public class AuthFacade {
         if (!passwordCredentialReader.verify(account.userId(), rawPassword)) {
             fail(account.userId(), FailureReason.BAD_CREDENTIAL, ip, now);
         }
+        accountLockProcessor.resetFailures(account.userId());
 
         // 기기 인식은 자격 검증 성공 후에만 수행한다 — 실패 시도가 기기 행을 만들지 않게 한다.
         RecognizedDeviceInfo recognized = deviceRecognitionService.recognize(
@@ -163,6 +174,10 @@ public class AuthFacade {
 
     private void fail(@Nullable UUID userId, FailureReason reason, String ip, Instant now) {
         loginAttemptAppender.record(userId, LoginResult.FAILURE, reason, ip, null, 0, null, now);
+        if (userId != null && reason == FailureReason.BAD_CREDENTIAL) {
+            // 연속 실패 잠금은 자격증명 실패만 센다 — 차단·비활성 시도는 자격 증거가 아니다.
+            accountLockProcessor.recordFailure(userId, now);
+        }
         messagePublisher.publish(new LoginFailed(userId, reason, now));
         throw new AuthException(AuthErrorCode.AUTHENTICATION_FAILED);
     }

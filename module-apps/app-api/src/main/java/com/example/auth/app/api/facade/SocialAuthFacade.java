@@ -25,6 +25,7 @@ import com.example.auth.domain.auth.info.RiskAssessmentInfo;
 import com.example.auth.domain.auth.info.SessionCreated;
 import com.example.auth.domain.auth.info.SocialAuthenticationInfo;
 import com.example.auth.domain.auth.info.SocialRegistrationStartedInfo;
+import com.example.auth.domain.auth.service.AccountLockProcessor;
 import com.example.auth.domain.auth.service.AccountRegistrationProcessor;
 import com.example.auth.domain.auth.service.AuthAccountReader;
 import com.example.auth.domain.auth.service.DeviceRecognitionService;
@@ -59,6 +60,7 @@ public class SocialAuthFacade {
     private final RegistrationSessionProcessor registrationSessionProcessor;
     private final AccountRegistrationProcessor accountRegistrationProcessor;
     private final AuthAccountReader authAccountReader;
+    private final AccountLockProcessor accountLockProcessor;
     private final RateLimitPolicyValidator rateLimitPolicyValidator;
     private final LoginAttemptAppender loginAttemptAppender;
     private final DeviceRecognitionService deviceRecognitionService;
@@ -73,6 +75,7 @@ public class SocialAuthFacade {
             RegistrationSessionProcessor registrationSessionProcessor,
             AccountRegistrationProcessor accountRegistrationProcessor,
             AuthAccountReader authAccountReader,
+            AccountLockProcessor accountLockProcessor,
             RateLimitPolicyValidator rateLimitPolicyValidator,
             LoginAttemptAppender loginAttemptAppender,
             DeviceRecognitionService deviceRecognitionService,
@@ -85,6 +88,7 @@ public class SocialAuthFacade {
         this.registrationSessionProcessor = registrationSessionProcessor;
         this.accountRegistrationProcessor = accountRegistrationProcessor;
         this.authAccountReader = authAccountReader;
+        this.accountLockProcessor = accountLockProcessor;
         this.rateLimitPolicyValidator = rateLimitPolicyValidator;
         this.loginAttemptAppender = loginAttemptAppender;
         this.deviceRecognitionService = deviceRecognitionService;
@@ -125,6 +129,14 @@ public class SocialAuthFacade {
         LoginAccountInfo account = authAccountReader
                 .findForLogin(connectedUserId)
                 .orElseThrow(() -> new IllegalStateException("연동이 가리키는 인증 계정이 없습니다: " + connectedUserId));
+        // 쿨다운이 경과한 일시 잠금은 판정 직전에 해제한다(lazy — 로컬 로그인과 동일 정책).
+        if (!account.loginAllowed()
+                && account.blockReason() == FailureReason.LOCKED
+                && accountLockProcessor.releaseIfCooldownElapsed(account.userId(), now)) {
+            account = authAccountReader
+                    .findForLogin(connectedUserId)
+                    .orElseThrow(() -> new IllegalStateException("연동이 가리키는 인증 계정이 없습니다: " + connectedUserId));
+        }
         if (!account.loginAllowed()) {
             fail(account.userId(), requireNonNull(account.blockReason()), ip, now);
         }
