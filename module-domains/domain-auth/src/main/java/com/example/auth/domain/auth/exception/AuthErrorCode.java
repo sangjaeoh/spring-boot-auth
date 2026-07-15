@@ -26,6 +26,9 @@ public enum AuthErrorCode implements ErrorCode {
     SOCIAL_PROVIDER_ALREADY_LINKED("AUTH_SOCIAL_PROVIDER_ALREADY_LINKED", "이미 연동된 소셜 제공자입니다.", 409),
     SOCIAL_CONNECTION_NOT_FOUND("AUTH_SOCIAL_CONNECTION_NOT_FOUND", "연동된 소셜 계정이 없습니다.", 404),
     LAST_LOGIN_METHOD("AUTH_LAST_LOGIN_METHOD", "마지막 로그인 수단은 해제할 수 없습니다.", 409),
+    DEVICE_NOT_FOUND("AUTH_DEVICE_NOT_FOUND", "등록된 기기를 찾을 수 없습니다.", 404),
+    DEVICE_ALREADY_REGISTERED("AUTH_DEVICE_ALREADY_REGISTERED", "이미 등록된 기기입니다.", 409),
+    SESSION_NOT_FOUND("AUTH_SESSION_NOT_FOUND", "세션을 찾을 수 없습니다.", 404),
     SESSION_STORE_UNAVAILABLE("AUTH_SESSION_STORE_UNAVAILABLE", "일시적으로 세션 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.", 503);
 
     private final String code;

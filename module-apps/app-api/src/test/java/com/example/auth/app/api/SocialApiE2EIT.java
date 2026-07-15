@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.auth.app.api.facade.AccountProvisioningFacade;
 import com.example.auth.app.api.presentation.v1.ConsentsRequest;
+import com.example.auth.app.api.presentation.v1.DeviceBindingRequestFixture;
 import com.example.auth.app.api.presentation.v1.IdentityVerifyRequest;
 import com.example.auth.app.api.presentation.v1.LoginRequest;
 import com.example.auth.app.api.presentation.v1.MeResponse;
@@ -92,7 +93,10 @@ class SocialApiE2EIT {
 
         ResponseEntity<SocialRegistrationCompleteResponse> completed = rest.postForEntity(
                 "/auth/social/registration/complete",
-                new SocialRegistrationCompleteRequest(registration.registrationId(), registration.onboardingToken()),
+                new SocialRegistrationCompleteRequest(
+                        registration.registrationId(),
+                        registration.onboardingToken(),
+                        DeviceBindingRequestFixture.webDevice()),
                 SocialRegistrationCompleteResponse.class);
         assertThat(completed.getStatusCode().value()).isEqualTo(201);
         SocialRegistrationCompleteResponse body = requireNonNull(completed.getBody());
@@ -117,7 +121,10 @@ class SocialApiE2EIT {
         // 소비된 세션 재커밋은 404.
         ResponseEntity<String> replayed = rest.postForEntity(
                 "/auth/social/registration/complete",
-                new SocialRegistrationCompleteRequest(registration.registrationId(), registration.onboardingToken()),
+                new SocialRegistrationCompleteRequest(
+                        registration.registrationId(),
+                        registration.onboardingToken(),
+                        DeviceBindingRequestFixture.webDevice()),
                 String.class);
         assertThat(replayed.getStatusCode().value()).isEqualTo(404);
 
@@ -131,7 +138,10 @@ class SocialApiE2EIT {
     @Test
     void rejectsForgedMockToken() {
         ResponseEntity<String> response = rest.postForEntity(
-                "/auth/social/login", new SocialLoginRequest(SocialProvider.KAKAO, "not-a-mock-token"), String.class);
+                "/auth/social/login",
+                new SocialLoginRequest(
+                        SocialProvider.KAKAO, "not-a-mock-token", DeviceBindingRequestFixture.webDevice()),
+                String.class);
         assertThat(response.getStatusCode().value()).isEqualTo(401);
     }
 
@@ -228,8 +238,10 @@ class SocialApiE2EIT {
     void disconnectsSocialWhenPasswordCredentialRemains() {
         String email = "local-with-social@example.com";
         accountProvisioningFacade.provision(email, "secret123");
-        ResponseEntity<TokenResponse> loggedIn =
-                rest.postForEntity("/auth/login", new LoginRequest(email, "secret123"), TokenResponse.class);
+        ResponseEntity<TokenResponse> loggedIn = rest.postForEntity(
+                "/auth/login",
+                new LoginRequest(email, "secret123", DeviceBindingRequestFixture.webDevice()),
+                TokenResponse.class);
         String accessToken = requireNonNull(loggedIn.getBody()).accessToken();
 
         connect(accessToken, SocialProvider.NAVER, "mock:naver-local:naver-local@example.com");
@@ -243,7 +255,9 @@ class SocialApiE2EIT {
 
     private SocialLoginResponse socialLogin(SocialProvider provider, String idToken) {
         ResponseEntity<SocialLoginResponse> response = rest.postForEntity(
-                "/auth/social/login", new SocialLoginRequest(provider, idToken), SocialLoginResponse.class);
+                "/auth/social/login",
+                new SocialLoginRequest(provider, idToken, DeviceBindingRequestFixture.webDevice()),
+                SocialLoginResponse.class);
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         return requireNonNull(response.getBody());
     }
@@ -257,7 +271,10 @@ class SocialApiE2EIT {
         submitConsents(registration.registrationId(), registration.onboardingToken());
         ResponseEntity<SocialRegistrationCompleteResponse> completed = rest.postForEntity(
                 "/auth/social/registration/complete",
-                new SocialRegistrationCompleteRequest(registration.registrationId(), registration.onboardingToken()),
+                new SocialRegistrationCompleteRequest(
+                        registration.registrationId(),
+                        registration.onboardingToken(),
+                        DeviceBindingRequestFixture.webDevice()),
                 SocialRegistrationCompleteResponse.class);
         assertThat(completed.getStatusCode().value()).isEqualTo(201);
         return requireNonNull(completed.getBody());

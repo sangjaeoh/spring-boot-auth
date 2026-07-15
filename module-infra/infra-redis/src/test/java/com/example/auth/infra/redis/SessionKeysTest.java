@@ -9,8 +9,9 @@ import org.springframework.data.redis.connection.ClusterSlotHashUtil;
 /**
  * 세션 키 슬롯 불변식: 한 사용자의 애그리거트 키가 전부 단일 Cluster 슬롯에 놓임을 강제한다.
  *
- * <p>회전 Lua는 같은 슬롯의 다중 키에서만 원자적이다(CROSSSLOT EVAL 불가). {@link ClusterSlotHashUtil}은
- * Redis와 동일한 CRC16+해시태그 규칙이라 라이브 클러스터 없이 결정적으로 검증한다.
+ * <p>생성(상한 축출)·회전 Lua는 같은 슬롯의 다중 키에서만 원자적이다(CROSSSLOT EVAL 불가).
+ * {@link ClusterSlotHashUtil}은 Redis와 동일한 CRC16+해시태그 규칙이라 라이브 클러스터 없이 결정적으로
+ * 검증한다.
  */
 class SessionKeysTest {
 
@@ -20,8 +21,8 @@ class SessionKeysTest {
 
     @Test
     void allSessionAggregateKeysShareOneSlot() {
-        // 회전 Lua가 KEYS로 받는 sessKey(앵커)·idxKey와 ARGV 접두로 내부에서 만지는 키(grace SET·REUSE의
-        // DEL 루프 sessPrefix+sid)가 전부 동일 슬롯 → 단일 슬롯 EVAL이라 Cluster에서도 원자적이다.
+        // 생성·회전 Lua가 KEYS로 받는 sessKey(앵커)·idxKey와 ARGV 접두로 내부에서 만지는 키(grace SET·
+        // 축출/REUSE의 DEL 루프 sessPrefix+sid)가 전부 동일 슬롯 → 단일 슬롯 EVAL이라 Cluster에서도 원자적이다.
         int slot = ClusterSlotHashUtil.calculateSlot(SessionKeys.sessionKey(USER, SESSION));
 
         assertThat(ClusterSlotHashUtil.calculateSlot(SessionKeys.indexKey(USER)))

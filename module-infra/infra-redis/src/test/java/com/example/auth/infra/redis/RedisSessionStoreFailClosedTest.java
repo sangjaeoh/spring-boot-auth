@@ -63,7 +63,11 @@ class RedisSessionStoreFailClosedTest {
         rotateScript.setLocation(new ClassPathResource("redis/rotate_session.lua"));
         rotateScript.setResultType(String.class);
 
-        store = new RedisSessionStore(template, rotateScript);
+        DefaultRedisScript<String> createScript = new DefaultRedisScript<>();
+        createScript.setLocation(new ClassPathResource("redis/create_session.lua"));
+        createScript.setResultType(String.class);
+
+        store = new RedisSessionStore(template, rotateScript, createScript, 0, 250);
     }
 
     @AfterEach
@@ -92,13 +96,38 @@ class RedisSessionStoreFailClosedTest {
         assertThatThrownBy(() -> store.create(
                         UUID.randomUUID(),
                         UUID.randomUUID(),
-                        null,
+                        UUID.randomUUID(),
                         "1.2.3.4",
                         "agent",
                         "jti",
                         "plain",
                         Instant.now(),
-                        TTL))
+                        TTL,
+                        3))
+                .isInstanceOf(AuthException.class)
+                .extracting(e -> ((AuthException) e).getErrorCode())
+                .isEqualTo(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
+    }
+
+    @Test
+    void findAllActiveFailsWith503WhenStoreUnreachable() {
+        assertThatThrownBy(() -> store.findAllActive(UUID.randomUUID(), Instant.now()))
+                .isInstanceOf(AuthException.class)
+                .extracting(e -> ((AuthException) e).getErrorCode())
+                .isEqualTo(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
+    }
+
+    @Test
+    void revokeAllExceptFailsWith503WhenStoreUnreachable() {
+        assertThatThrownBy(() -> store.revokeAllExcept(UUID.randomUUID(), UUID.randomUUID()))
+                .isInstanceOf(AuthException.class)
+                .extracting(e -> ((AuthException) e).getErrorCode())
+                .isEqualTo(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
+    }
+
+    @Test
+    void revokeByDeviceFailsWith503WhenStoreUnreachable() {
+        assertThatThrownBy(() -> store.revokeByDevice(UUID.randomUUID(), UUID.randomUUID()))
                 .isInstanceOf(AuthException.class)
                 .extracting(e -> ((AuthException) e).getErrorCode())
                 .isEqualTo(AuthErrorCode.SESSION_STORE_UNAVAILABLE);

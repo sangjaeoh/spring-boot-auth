@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.auth.app.api.facade.AccountProvisioningFacade;
+import com.example.auth.app.api.presentation.v1.DeviceBindingRequestFixture;
 import com.example.auth.app.api.presentation.v1.LoginRequest;
 import com.example.auth.app.api.presentation.v1.PasswordChangeRequest;
 import com.example.auth.app.api.presentation.v1.PasswordResetCompleteRequest;
@@ -194,14 +195,19 @@ class PasswordApiE2EIT {
     }
 
     private TokenResponse login(String email, String password) {
-        ResponseEntity<TokenResponse> response =
-                rest.postForEntity("/auth/login", new LoginRequest(email, password), TokenResponse.class);
+        ResponseEntity<TokenResponse> response = rest.postForEntity(
+                "/auth/login",
+                new LoginRequest(email, password, DeviceBindingRequestFixture.webDevice()),
+                TokenResponse.class);
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         return requireNonNull(response.getBody());
     }
 
     private int loginStatus(String email, String password) {
-        return rest.postForEntity("/auth/login", new LoginRequest(email, password), String.class)
+        return rest.postForEntity(
+                        "/auth/login",
+                        new LoginRequest(email, password, DeviceBindingRequestFixture.webDevice()),
+                        String.class)
                 .getStatusCode()
                 .value();
     }

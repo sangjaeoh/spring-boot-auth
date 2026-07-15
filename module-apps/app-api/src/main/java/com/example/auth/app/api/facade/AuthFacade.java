@@ -2,6 +2,7 @@ package com.example.auth.app.api.facade;
 
 import static java.util.Objects.requireNonNull;
 
+import com.example.auth.app.api.presentation.v1.DeviceBindingRequest;
 import com.example.auth.app.api.presentation.v1.TokenResponse;
 import com.example.auth.common.auth.jwt.JwtIssuer;
 import com.example.auth.common.messaging.MessagePublisher;
@@ -12,9 +13,11 @@ import com.example.auth.domain.auth.event.LoginFailed;
 import com.example.auth.domain.auth.exception.AuthErrorCode;
 import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.info.LoginAccountInfo;
+import com.example.auth.domain.auth.info.RecognizedDeviceInfo;
 import com.example.auth.domain.auth.info.RotationOutcome;
 import com.example.auth.domain.auth.info.SessionCreated;
 import com.example.auth.domain.auth.service.AuthAccountReader;
+import com.example.auth.domain.auth.service.DeviceRecognitionService;
 import com.example.auth.domain.auth.service.LoginAttemptAppender;
 import com.example.auth.domain.auth.service.PasswordCredentialReader;
 import com.example.auth.domain.auth.service.SessionProcessor;
@@ -41,6 +44,7 @@ public class AuthFacade {
     private final AuthAccountReader authAccountReader;
     private final PasswordCredentialReader passwordCredentialReader;
     private final LoginAttemptAppender loginAttemptAppender;
+    private final DeviceRecognitionService deviceRecognitionService;
     private final SessionProcessor sessionProcessor;
     private final JwtIssuer jwtIssuer;
     private final MessagePublisher messagePublisher;
@@ -50,6 +54,7 @@ public class AuthFacade {
             AuthAccountReader authAccountReader,
             PasswordCredentialReader passwordCredentialReader,
             LoginAttemptAppender loginAttemptAppender,
+            DeviceRecognitionService deviceRecognitionService,
             SessionProcessor sessionProcessor,
             JwtIssuer jwtIssuer,
             MessagePublisher messagePublisher,
@@ -57,6 +62,7 @@ public class AuthFacade {
         this.authAccountReader = authAccountReader;
         this.passwordCredentialReader = passwordCredentialReader;
         this.loginAttemptAppender = loginAttemptAppender;
+        this.deviceRecognitionService = deviceRecognitionService;
         this.sessionProcessor = sessionProcessor;
         this.jwtIssuer = jwtIssuer;
         this.messagePublisher = messagePublisher;
@@ -64,11 +70,13 @@ public class AuthFacade {
     }
 
     /**
-     * 접근 판정·비밀번호 검증을 거쳐 세션을 발급하고 Access·Refresh 토큰을 반환한다.
+     * 접근 판정·비밀번호 검증을 거쳐 기기를 인식하고(신규면 등록·감지 이벤트) 기기 바인딩 세션을 발급해
+     * Access·Refresh 토큰을 반환한다.
      *
      * @throws AuthException 인증 실패 시(사유 미구분 401)
      */
-    public TokenResponse login(String email, String rawPassword, String ip, @Nullable String userAgent) {
+    public TokenResponse login(
+            String email, String rawPassword, DeviceBindingRequest device, String ip, @Nullable String userAgent) {
         Instant now = Instant.now();
         Optional<LoginAccountInfo> found = authAccountReader.findForLogin(email);
         if (found.isEmpty()) {
@@ -85,8 +93,12 @@ public class AuthFacade {
             fail(account.userId(), FailureReason.BAD_CREDENTIAL, ip, now);
         }
 
-        SessionCreated session = sessionProcessor.createSession(account.userId(), null, ip, userAgent, now);
-        loginAttemptAppender.record(account.userId(), LoginResult.SUCCESS, null, ip, null, 0, now);
+        // 기기 인식은 자격 검증 성공 후에만 수행한다 — 실패 시도가 기기 행을 만들지 않게 한다.
+        RecognizedDeviceInfo recognized = deviceRecognitionService.recognize(
+                account.userId(), device.fingerprint(), device.deviceName(), device.platform(), ip, now);
+        SessionCreated session =
+                sessionProcessor.createSession(account.userId(), recognized.deviceId(), ip, userAgent, now);
+        loginAttemptAppender.record(account.userId(), LoginResult.SUCCESS, null, ip, recognized.deviceId(), 0, now);
         messagePublisher.publish(new LoggedIn(account.userId(), session.sessionId(), now));
         String accessToken =
                 jwtIssuer.issueAccess(account.userId(), session.sessionId(), DEFAULT_ROLES, accessTtl, now);

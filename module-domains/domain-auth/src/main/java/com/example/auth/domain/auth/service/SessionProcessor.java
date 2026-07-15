@@ -5,6 +5,7 @@ import static java.util.Objects.requireNonNull;
 import com.example.auth.common.core.crypto.TokenHasher;
 import com.example.auth.common.core.id.UuidV7Generator;
 import com.example.auth.common.messaging.MessagePublisher;
+import com.example.auth.domain.auth.event.ConcurrentLimitExceeded;
 import com.example.auth.domain.auth.event.RefreshReuseDetected;
 import com.example.auth.domain.auth.event.SessionRevoked;
 import com.example.auth.domain.auth.info.RotationOutcome;
@@ -15,6 +16,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,29 +40,46 @@ public class SessionProcessor {
     private final SecureRandom random = new SecureRandom();
     private final Duration sessionTtl;
     private final Duration graceWindow;
+    private final int maxConcurrentSessions;
 
     public SessionProcessor(
             SessionStore sessionStore,
             TokenHasher tokenHasher,
             MessagePublisher messagePublisher,
             @Value("${auth.session.ttl-days:14}") int sessionTtlDays,
-            @Value("${auth.refresh.grace-seconds:10}") long graceSeconds) {
+            @Value("${auth.refresh.grace-seconds:10}") long graceSeconds,
+            @Value("${auth.session.max-concurrent:3}") int maxConcurrentSessions) {
         this.sessionStore = sessionStore;
         this.tokenHasher = tokenHasher;
         this.messagePublisher = messagePublisher;
         this.sessionTtl = Duration.ofDays(sessionTtlDays);
         this.graceWindow = Duration.ofSeconds(graceSeconds);
+        this.maxConcurrentSessions = maxConcurrentSessions;
     }
 
     /**
-     * 새 세션을 생성하고 세션ID·리프레시 원문을 반환한다.
+     * 새 세션을 생성하고 세션ID·리프레시 원문을 반환한다. 동시 활성 세션이 상한을 넘으면 최오래 세션이
+     * 원자 축출되며 {@link ConcurrentLimitExceeded}를 발행한다.
      */
     public SessionCreated createSession(
-            UUID userId, @Nullable UUID deviceId, String ip, @Nullable String userAgent, Instant now) {
+            UUID userId, UUID deviceId, String ip, @Nullable String userAgent, Instant now) {
         UUID sessionId = UuidV7Generator.generate();
         String refreshPlain = newOpaqueToken();
         String jtiHash = tokenHasher.hash(refreshPlain);
-        sessionStore.create(userId, sessionId, deviceId, ip, userAgent, jtiHash, refreshPlain, now, sessionTtl);
+        List<UUID> evicted = sessionStore.create(
+                userId,
+                sessionId,
+                deviceId,
+                ip,
+                userAgent,
+                jtiHash,
+                refreshPlain,
+                now,
+                sessionTtl,
+                maxConcurrentSessions);
+        if (!evicted.isEmpty()) {
+            messagePublisher.publish(new ConcurrentLimitExceeded(userId, evicted, now));
+        }
         return new SessionCreated(sessionId, userId, refreshPlain);
     }
 
@@ -106,10 +125,24 @@ public class SessionProcessor {
     }
 
     /**
-     * 사용자의 전체 세션을 무효화한다(비밀번호 재설정 등 자격증명 변동 시 기존 세션 전멸).
+     * 사용자의 전체 세션을 무효화한다(비밀번호 재설정·관리자 강제 종료 등 자격증명 변동 시 기존 세션 전멸).
      */
     public void revokeAll(UUID userId) {
         sessionStore.revokeAll(userId);
+    }
+
+    /**
+     * 현재 세션을 제외한 사용자의 전체 세션을 무효화한다.
+     */
+    public void revokeAllExcept(UUID userId, UUID currentSessionId) {
+        sessionStore.revokeAllExcept(userId, currentSessionId);
+    }
+
+    /**
+     * 해당 기기에 바인딩된 사용자의 세션을 무효화한다(기기 삭제 교차).
+     */
+    public void revokeByDevice(UUID userId, UUID deviceId) {
+        sessionStore.revokeByDevice(userId, deviceId);
     }
 
     private String newOpaqueToken() {

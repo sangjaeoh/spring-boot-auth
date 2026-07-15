@@ -36,6 +36,7 @@ if presented == current then
     'prevJtiHash', current,
     'prevRotatedAt', now,
     'refreshJtiHash', newJti,
+    'lastAccessedAt', now,
     'expiresAt', now + sessionTtlMs)
   redis.call('PEXPIRE', sessKey, sessionTtlMs)
   redis.call('PEXPIRE', idxKey, sessionTtlMs)

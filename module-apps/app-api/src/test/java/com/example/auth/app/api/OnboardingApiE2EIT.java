@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.auth.app.api.presentation.v1.ChallengeResponse;
 import com.example.auth.app.api.presentation.v1.ConsentsRequest;
+import com.example.auth.app.api.presentation.v1.DeviceBindingRequestFixture;
 import com.example.auth.app.api.presentation.v1.EmailChallengeRequest;
 import com.example.auth.app.api.presentation.v1.IdentityVerifyRequest;
 import com.example.auth.app.api.presentation.v1.LoginRequest;
@@ -148,8 +149,10 @@ class OnboardingApiE2EIT {
         assertThat(count("select count(*) from usr.users")).isEqualTo(usersBefore + 1);
 
         // 가입 완료 → 로그인 → 세션 검증.
-        ResponseEntity<TokenResponse> loggedIn =
-                rest.postForEntity("/auth/login", new LoginRequest(email, "secret123"), TokenResponse.class);
+        ResponseEntity<TokenResponse> loggedIn = rest.postForEntity(
+                "/auth/login",
+                new LoginRequest(email, "secret123", DeviceBindingRequestFixture.webDevice()),
+                TokenResponse.class);
         assertThat(loggedIn.getStatusCode().value()).isEqualTo(200);
         HttpHeaders bearer = new HttpHeaders();
         bearer.setBearerAuth(requireNonNull(loggedIn.getBody()).accessToken());

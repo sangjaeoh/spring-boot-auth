@@ -22,4 +22,15 @@ public class RedisSessionConfig {
         script.setResultType(String.class);
         return script;
     }
+
+    /**
+     * 세션 생성 + 동시 세션 상한 원자 판정 Lua 스크립트를 로드한다.
+     */
+    @Bean
+    public RedisScript<String> createSessionScript() {
+        DefaultRedisScript<String> script = new DefaultRedisScript<>();
+        script.setLocation(new ClassPathResource("redis/create_session.lua"));
+        script.setResultType(String.class);
+        return script;
+    }
 }

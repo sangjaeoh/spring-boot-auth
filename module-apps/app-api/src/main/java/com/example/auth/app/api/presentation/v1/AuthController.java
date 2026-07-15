@@ -34,6 +34,7 @@ public class AuthController {
         return authFacade.login(
                 request.email(),
                 request.password(),
+                request.device(),
                 httpRequest.getRemoteAddr(),
                 httpRequest.getHeader(HttpHeaders.USER_AGENT));
     }

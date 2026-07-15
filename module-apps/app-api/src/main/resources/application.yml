@@ -47,6 +47,14 @@ user:
     ttl-minutes: 10
 
 auth:
+  session:
+    # 동시 활성 세션 상한(정책 확정 3). 초과 생성은 최오래(issuedAt) 세션을 Lua 원자 축출한다.
+    max-concurrent: 3
+    revoke-durability:
+      # revoke 계열 쓰기의 WAIT 최소 복제 확인 수. 0=미사용(단일 노드 dev/test). prod Cluster
+      # 오버레이가 1 이상으로 설정해 failover 시 무효화 유실을 차단한다. 시한 내 미달은 503(fail-closed).
+      min-replicas: 0
+      timeout-ms: 250
   registration:
     # 온보딩 세션 TTL(모델 확정 범위 30~60분). 만료 시 Redis가 자동 파기한다(영속 PENDING 금지).
     ttl-minutes: 30

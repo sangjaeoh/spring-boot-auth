@@ -39,6 +39,7 @@ public class SocialAuthController {
         return socialAuthFacade.login(
                 request.provider(),
                 request.idToken(),
+                request.device(),
                 httpRequest.getRemoteAddr(),
                 httpRequest.getHeader(HttpHeaders.USER_AGENT));
     }
@@ -54,6 +55,7 @@ public class SocialAuthController {
         return socialAuthFacade.completeRegistration(
                 request.registrationId(),
                 request.onboardingToken(),
+                request.device(),
                 httpRequest.getRemoteAddr(),
                 httpRequest.getHeader(HttpHeaders.USER_AGENT));
     }

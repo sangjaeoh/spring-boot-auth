@@ -1,33 +1,41 @@
 package com.example.auth.infra.redis;
 
+import static java.util.Objects.requireNonNull;
+
 import com.example.auth.domain.auth.exception.AuthErrorCode;
 import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.port.RotationResult;
+import com.example.auth.domain.auth.port.SessionSnapshot;
 import com.example.auth.domain.auth.port.SessionStore;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 /**
- * Redis 기반 세션 스토어다(진실원본). 회전은 Lua로 원자 판정한다.
+ * Redis 기반 세션 스토어다(진실원본). 생성(동시 세션 상한 검증 + 최오래 축출)과 회전은 Lua로 원자
+ * 판정한다.
  *
  * <p>키는 {@link SessionKeys}가 {@code {u:userId}} 해시태그로 단일 슬롯을 이뤄 Cluster에서도 Lua 원자성을
  * 보존한다. 저장소 예외 처리는 판정 지점별로 다르다 — 읽기 핫패스 {@code validate}는 fail-closed로 무효
- * 처리하고(가용성보다 실시간 무효화), 쓰기·회전은 {@link AuthErrorCode#SESSION_STORE_UNAVAILABLE}(503)로
- * 실패시켜 토큰을 발급하지 않는다. 동시세션 상한·축출은 이 슬라이스 범위 밖(Phase 3)이라 create는 세션
- * 인덱스만 유지한다.
+ * 처리하고(가용성보다 실시간 무효화), 그 외 연산은 {@link AuthErrorCode#SESSION_STORE_UNAVAILABLE}(503)로
+ * 실패시켜 토큰을 발급하지 않는다. revoke 계열은 {@code auth.session.revoke-durability.min-replicas} 설정
+ * 시 {@code WAIT}로 복제 확인까지 강제해 failover 시 무효화 유실을 차단한다(미달 시 동일 503).
  */
 @Component
 public class RedisSessionStore implements SessionStore {
@@ -38,52 +46,49 @@ public class RedisSessionStore implements SessionStore {
 
     private final StringRedisTemplate redis;
     private final RedisScript<String> rotateScript;
+    private final RedisScript<String> createScript;
+    private final int revokeMinReplicas;
+    private final Duration revokeReplicaTimeout;
 
     public RedisSessionStore(
-            StringRedisTemplate redis, @Qualifier("rotateSessionScript") RedisScript<String> rotateSessionScript) {
+            StringRedisTemplate redis,
+            @Qualifier("rotateSessionScript") RedisScript<String> rotateSessionScript,
+            @Qualifier("createSessionScript") RedisScript<String> createSessionScript,
+            @Value("${auth.session.revoke-durability.min-replicas:0}") int revokeMinReplicas,
+            @Value("${auth.session.revoke-durability.timeout-ms:250}") long revokeReplicaTimeoutMs) {
         this.redis = redis;
         this.rotateScript = rotateSessionScript;
+        this.createScript = createSessionScript;
+        this.revokeMinReplicas = revokeMinReplicas;
+        this.revokeReplicaTimeout = Duration.ofMillis(revokeReplicaTimeoutMs);
     }
 
     @Override
-    public void create(
+    public List<UUID> create(
             UUID userId,
             UUID sessionId,
-            @Nullable UUID deviceId,
+            UUID deviceId,
             String ip,
             @Nullable String userAgent,
             String refreshJtiHash,
             String refreshPlain,
             Instant now,
-            Duration sessionTtl) {
-        long nowMs = now.toEpochMilli();
-        long expiresMs = nowMs + sessionTtl.toMillis();
-        Map<String, String> fields = Map.of(
-                "status",
-                STATUS_ACTIVE,
-                "deviceId",
-                deviceId == null ? "" : deviceId.toString(),
-                "ip",
-                ip,
-                "ua",
-                userAgent == null ? "" : userAgent,
-                "issuedAt",
-                Long.toString(nowMs),
-                "expiresAt",
-                Long.toString(expiresMs),
-                "refreshJtiHash",
-                refreshJtiHash,
-                "prevJtiHash",
-                "",
-                "prevRotatedAt",
-                "0");
-
-        String sessKey = SessionKeys.sessionKey(userId, sessionId);
+            Duration sessionTtl,
+            int maxSessions) {
+        @Nullable String evictedJoined;
         try {
-            redis.<String, String>opsForHash().putAll(sessKey, fields);
-            redis.expire(sessKey, sessionTtl);
-            redis.opsForZSet().add(SessionKeys.indexKey(userId), sessionId.toString(), nowMs);
-            redis.expire(SessionKeys.indexKey(userId), sessionTtl);
+            evictedJoined = redis.execute(
+                    createScript,
+                    List.of(SessionKeys.sessionKey(userId, sessionId), SessionKeys.indexKey(userId)),
+                    sessionId.toString(),
+                    deviceId.toString(),
+                    ip,
+                    userAgent == null ? "" : userAgent,
+                    refreshJtiHash,
+                    Long.toString(now.toEpochMilli()),
+                    Long.toString(sessionTtl.toMillis()),
+                    Integer.toString(maxSessions),
+                    SessionKeys.sessionPrefix(userId));
             // 역인덱스는 회전 세대마다 누적되나 sessionTtl로 자동 만료된다(다세대 재사용 탐지를 위해 제시분을
             // 즉시 삭제하지 않는다). 규모 시 전용 짧은 TTL로 분리를 검토한다. refidx를 마지막에 세워 부분
             // 실패 시 세션이 resolve되지 않게 한다(fail-closed). 비원자 부분쓰기 잔류는 REDIS_HA.md 참조.
@@ -92,6 +97,10 @@ public class RedisSessionStore implements SessionStore {
             log.warn("세션 생성 중 Redis 예외 — fail-closed(503)", e);
             throw new AuthException(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
         }
+        if (evictedJoined == null || evictedJoined.isEmpty()) {
+            return List.of();
+        }
+        return Arrays.stream(evictedJoined.split(",")).map(UUID::fromString).toList();
     }
 
     @Override
@@ -109,6 +118,44 @@ public class RedisSessionStore implements SessionStore {
         } catch (DataAccessException e) {
             log.warn("세션 검증 중 Redis 예외 — fail-closed", e);
             return false;
+        }
+    }
+
+    @Override
+    public List<SessionSnapshot> findAllActive(UUID userId, Instant now) {
+        try {
+            Set<String> members = redis.opsForZSet().range(SessionKeys.indexKey(userId), 0, -1);
+            if (members == null) {
+                return List.of();
+            }
+            HashOperations<String, String, String> hash = redis.opsForHash();
+            List<SessionSnapshot> snapshots = new ArrayList<>();
+            for (String sessionId : members) {
+                List<String> values = hash.multiGet(
+                        SessionKeys.sessionPrefix(userId) + sessionId,
+                        List.of("status", "deviceId", "ip", "ua", "issuedAt", "lastAccessedAt", "expiresAt"));
+                String status = values.get(0);
+                String expiresAt = values.get(6);
+                // TTL 만료로 해시만 사라진 잔여 인덱스 멤버는 건너뛴다(다음 생성 Lua가 걷어낸다).
+                if (status == null || expiresAt == null) {
+                    continue;
+                }
+                if (!STATUS_ACTIVE.equals(status) || now.toEpochMilli() > Long.parseLong(expiresAt)) {
+                    continue;
+                }
+                String userAgent = requireNonNull(values.get(3));
+                snapshots.add(new SessionSnapshot(
+                        UUID.fromString(sessionId),
+                        UUID.fromString(requireNonNull(values.get(1))),
+                        requireNonNull(values.get(2)),
+                        userAgent.isEmpty() ? null : userAgent,
+                        Instant.ofEpochMilli(Long.parseLong(requireNonNull(values.get(4)))),
+                        Instant.ofEpochMilli(Long.parseLong(requireNonNull(values.get(5))))));
+            }
+            return snapshots;
+        } catch (DataAccessException e) {
+            log.warn("세션 목록 조회 중 Redis 예외 — fail-closed(503)", e);
+            throw new AuthException(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
         }
     }
 
@@ -177,6 +224,7 @@ public class RedisSessionStore implements SessionStore {
         try {
             redis.delete(SessionKeys.sessionKey(userId, sessionId));
             redis.opsForZSet().remove(SessionKeys.indexKey(userId), sessionId.toString());
+            awaitRevokeDurability();
         } catch (DataAccessException e) {
             log.warn("세션 무효화 중 Redis 예외 — fail-closed(503)", e);
             throw new AuthException(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
@@ -193,8 +241,70 @@ public class RedisSessionStore implements SessionStore {
                 }
             }
             redis.delete(SessionKeys.indexKey(userId));
+            awaitRevokeDurability();
         } catch (DataAccessException e) {
             log.warn("세션 전체 무효화 중 Redis 예외 — fail-closed(503)", e);
+            throw new AuthException(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
+        }
+    }
+
+    @Override
+    public void revokeAllExcept(UUID userId, UUID keepSessionId) {
+        String keep = keepSessionId.toString();
+        try {
+            Set<String> members = redis.opsForZSet().range(SessionKeys.indexKey(userId), 0, -1);
+            if (members != null) {
+                for (String sessionId : members) {
+                    if (keep.equals(sessionId)) {
+                        continue;
+                    }
+                    redis.delete(SessionKeys.sessionPrefix(userId) + sessionId);
+                    redis.opsForZSet().remove(SessionKeys.indexKey(userId), sessionId);
+                }
+            }
+            awaitRevokeDurability();
+        } catch (DataAccessException e) {
+            log.warn("세션 선택 무효화 중 Redis 예외 — fail-closed(503)", e);
+            throw new AuthException(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
+        }
+    }
+
+    @Override
+    public void revokeByDevice(UUID userId, UUID deviceId) {
+        String device = deviceId.toString();
+        try {
+            Set<String> members = redis.opsForZSet().range(SessionKeys.indexKey(userId), 0, -1);
+            if (members != null) {
+                HashOperations<String, String, String> hash = redis.opsForHash();
+                for (String sessionId : members) {
+                    String sessKey = SessionKeys.sessionPrefix(userId) + sessionId;
+                    if (device.equals(hash.get(sessKey, "deviceId"))) {
+                        redis.delete(sessKey);
+                        redis.opsForZSet().remove(SessionKeys.indexKey(userId), sessionId);
+                    }
+                }
+            }
+            awaitRevokeDurability();
+        } catch (DataAccessException e) {
+            log.warn("기기 세션 무효화 중 Redis 예외 — fail-closed(503)", e);
+            throw new AuthException(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
+        }
+    }
+
+    /**
+     * revoke 쓰기가 최소 {@code min-replicas}개 복제본에 도달했는지 {@code WAIT}로 확인한다. 미설정(0)이면
+     * 건너뛰고, 시한 내 미달이면 503으로 실패시켜 failover 시 무효화가 조용히 유실되지 않게 한다.
+     */
+    private void awaitRevokeDurability() {
+        if (revokeMinReplicas <= 0) {
+            return;
+        }
+        Long acked = redis.execute((RedisCallback<Long>) connection -> (Long) connection.execute(
+                "WAIT",
+                Integer.toString(revokeMinReplicas).getBytes(StandardCharsets.UTF_8),
+                Long.toString(revokeReplicaTimeout.toMillis()).getBytes(StandardCharsets.UTF_8)));
+        if (acked == null || acked < revokeMinReplicas) {
+            log.warn("revoke 복제 확인 미달(acked={}, 요구={}) — fail-closed(503)", acked, revokeMinReplicas);
             throw new AuthException(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
         }
     }
