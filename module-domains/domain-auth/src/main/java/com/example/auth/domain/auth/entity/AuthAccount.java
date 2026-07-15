@@ -8,6 +8,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
@@ -19,7 +21,7 @@ import org.jspecify.annotations.Nullable;
  * {@code userStatus}는 유저가 유일 writer인 읽기전용 투영이며 {@code applyUserStatus}가 단조
  * {@code userStatusVersion}으로 순서 역전 없이 멱등 반영한다. 탈퇴 반영 시 {@code loginEmail}을
  * 파기(null)해 식별자를 해제한다 — 유니크 인덱스는 null을 제외하므로 재가입이 같은 이메일을 쓸 수 있다.
- * 잠금 전이 메서드는 writer(P5)가 생길 때 추가한다.
+ * 잠금 오버레이({@code lockState})는 생명주기와 직교하며 일시 잠금은 쿨다운 경과 시 해제된다.
  */
 @Entity
 @Table(schema = "auth", name = "auth_account")
@@ -37,6 +39,15 @@ public class AuthAccount extends BaseTimeEntity<UUID> {
     @Enumerated(EnumType.STRING)
     @Column(name = "lock_state", length = 20)
     private LockState lockState;
+
+    @Column(name = "locked_at")
+    @Nullable
+    private Instant lockedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lock_reason", length = 40)
+    @Nullable
+    private LockReason lockReason;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "user_status", length = 20)
@@ -67,6 +78,39 @@ public class AuthAccount extends BaseTimeEntity<UUID> {
      */
     public boolean isLoginAllowed() {
         return userStatus == LifecycleStatus.ACTIVE && lockState == LockState.NONE;
+    }
+
+    /**
+     * 연속 로그인 실패로 일시 잠금한다(NONE → TEMP_LOCKED).
+     */
+    public void lockTemporarily(LockReason reason, Instant at) {
+        if (lockState != LockState.NONE) {
+            throw new IllegalStateException("NONE 상태만 일시 잠금할 수 있다: " + lockState);
+        }
+        this.lockState = LockState.TEMP_LOCKED;
+        this.lockReason = reason;
+        this.lockedAt = at;
+    }
+
+    /**
+     * 일시 잠금을 해제한다(TEMP_LOCKED → NONE) — 쿨다운 경과 자동 해제 경로.
+     */
+    public void releaseTemporaryLock() {
+        if (lockState != LockState.TEMP_LOCKED) {
+            throw new IllegalStateException("TEMP_LOCKED 상태만 해제할 수 있다: " + lockState);
+        }
+        this.lockState = LockState.NONE;
+        this.lockReason = null;
+        this.lockedAt = null;
+    }
+
+    /**
+     * 일시 잠금의 쿨다운이 경과했는지 반환한다(관리자 잠금은 항상 false — 관리자 해제 필요).
+     */
+    public boolean isTemporaryLockExpired(Instant now, Duration cooldown) {
+        return lockState == LockState.TEMP_LOCKED
+                && lockedAt != null
+                && !lockedAt.plus(cooldown).isAfter(now);
     }
 
     /**
@@ -107,6 +151,14 @@ public class AuthAccount extends BaseTimeEntity<UUID> {
 
     public LockState getLockState() {
         return lockState;
+    }
+
+    public @Nullable Instant getLockedAt() {
+        return lockedAt;
+    }
+
+    public @Nullable LockReason getLockReason() {
+        return lockReason;
     }
 
     public LifecycleStatus getUserStatus() {
