@@ -71,7 +71,8 @@ class LoginAttemptRetentionIT {
     }
 
     private LoginAttempt attempt(String ip, Instant at) {
-        return repository.save(LoginAttempt.create(UUID.randomUUID(), LoginResult.SUCCESS, null, ip, null, 0, at));
+        return repository.save(
+                LoginAttempt.create(UUID.randomUUID(), LoginResult.SUCCESS, null, ip, null, 0, "KR", at));
     }
 
     private static Instant yearsAgo(int years) {

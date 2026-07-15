@@ -33,7 +33,8 @@ public class LoginAttemptAppender {
             String ip,
             @Nullable UUID deviceId,
             int riskScore,
+            @Nullable String countryCode,
             Instant at) {
-        repository.save(LoginAttempt.create(userId, result, failureReason, ip, deviceId, riskScore, at));
+        repository.save(LoginAttempt.create(userId, result, failureReason, ip, deviceId, riskScore, countryCode, at));
     }
 }

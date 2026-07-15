@@ -1,6 +1,7 @@
 package com.example.auth.domain.auth.repository;
 
 import com.example.auth.domain.auth.entity.LoginAttempt;
+import com.example.auth.domain.auth.entity.LoginResult;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -14,4 +15,8 @@ public interface LoginAttemptRepository extends JpaRepository<LoginAttempt, UUID
     List<LoginAttempt> findByAtBefore(Instant cutoff);
 
     long deleteByAtBefore(Instant cutoff);
+
+    List<LoginAttempt> findTop20ByUserIdAndResultOrderByAtDesc(UUID userId, LoginResult result);
+
+    long countByUserIdAndResultAndAtAfter(UUID userId, LoginResult result, Instant after);
 }

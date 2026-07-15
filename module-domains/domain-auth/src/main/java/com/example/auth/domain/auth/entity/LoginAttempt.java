@@ -15,8 +15,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * 로그인 성공/실패의 불변 시도 기록이다(append-only 루트).
  *
- * <p>연속 실패 잠금 카운터(Redis)와 분리한다. 위험도·기기는 후속 단계에서 채우며 이 슬라이스는 플레이스홀더
- * ({@code riskScore=0}, {@code deviceId=null})다.
+ * <p>연속 실패 잠금 카운터(Redis)와 분리한다. {@code riskScore}·{@code countryCode}는 성공 로그인의
+ * 위험도 평가({@code RiskEvaluator})가 채우고, 실패 기록은 0·null이다.
  */
 @Entity
 @Table(schema = "auth", name = "login_attempt")
@@ -48,6 +48,10 @@ public class LoginAttempt extends BaseTimeEntity<UUID> {
     @Column(name = "risk_score")
     private int riskScore;
 
+    @Column(name = "country_code", length = 2)
+    @Nullable
+    private String countryCode;
+
     @Column(name = "attempted_at")
     private Instant at;
 
@@ -61,6 +65,7 @@ public class LoginAttempt extends BaseTimeEntity<UUID> {
             String ip,
             @Nullable UUID deviceId,
             int riskScore,
+            @Nullable String countryCode,
             Instant at) {
         this.id = id;
         this.userId = userId;
@@ -69,6 +74,7 @@ public class LoginAttempt extends BaseTimeEntity<UUID> {
         this.ip = ip;
         this.deviceId = deviceId;
         this.riskScore = riskScore;
+        this.countryCode = countryCode;
         this.at = at;
     }
 
@@ -82,8 +88,10 @@ public class LoginAttempt extends BaseTimeEntity<UUID> {
             String ip,
             @Nullable UUID deviceId,
             int riskScore,
+            @Nullable String countryCode,
             Instant at) {
-        return new LoginAttempt(UuidV7Generator.generate(), userId, result, failureReason, ip, deviceId, riskScore, at);
+        return new LoginAttempt(
+                UuidV7Generator.generate(), userId, result, failureReason, ip, deviceId, riskScore, countryCode, at);
     }
 
     /**
@@ -137,6 +145,10 @@ public class LoginAttempt extends BaseTimeEntity<UUID> {
 
     public int getRiskScore() {
         return riskScore;
+    }
+
+    public @Nullable String getCountryCode() {
+        return countryCode;
     }
 
     public Instant getAt() {
