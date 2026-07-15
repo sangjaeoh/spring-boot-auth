@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import com.example.auth.common.core.crypto.TokenHasher;
 import com.example.auth.common.core.id.UuidV7Generator;
+import com.example.auth.common.messaging.MessagePublisher;
 import com.example.auth.domain.auth.event.RefreshReuseDetected;
 import com.example.auth.domain.auth.event.SessionRevoked;
 import com.example.auth.domain.auth.info.RotationOutcome;
@@ -17,7 +18,6 @@ import java.util.Base64;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 /**
@@ -34,7 +34,7 @@ public class SessionProcessor {
 
     private final SessionStore sessionStore;
     private final TokenHasher tokenHasher;
-    private final ApplicationEventPublisher eventPublisher;
+    private final MessagePublisher messagePublisher;
     private final SecureRandom random = new SecureRandom();
     private final Duration sessionTtl;
     private final Duration graceWindow;
@@ -42,12 +42,12 @@ public class SessionProcessor {
     public SessionProcessor(
             SessionStore sessionStore,
             TokenHasher tokenHasher,
-            ApplicationEventPublisher eventPublisher,
+            MessagePublisher messagePublisher,
             @Value("${auth.session.ttl-days:14}") int sessionTtlDays,
             @Value("${auth.refresh.grace-seconds:10}") long graceSeconds) {
         this.sessionStore = sessionStore;
         this.tokenHasher = tokenHasher;
-        this.eventPublisher = eventPublisher;
+        this.messagePublisher = messagePublisher;
         this.sessionTtl = Duration.ofDays(sessionTtlDays);
         this.graceWindow = Duration.ofSeconds(graceSeconds);
     }
@@ -83,7 +83,7 @@ public class SessionProcessor {
             case REUSE -> {
                 UUID userId = requireNonNull(result.userId());
                 UUID sessionId = requireNonNull(result.sessionId());
-                eventPublisher.publishEvent(new RefreshReuseDetected(userId, sessionId));
+                messagePublisher.publish(new RefreshReuseDetected(userId, sessionId, now));
                 yield RotationOutcome.reuseDetected();
             }
             case INVALID -> RotationOutcome.invalid();
@@ -102,7 +102,7 @@ public class SessionProcessor {
      */
     public void revoke(UUID userId, UUID sessionId) {
         sessionStore.revoke(userId, sessionId);
-        eventPublisher.publishEvent(new SessionRevoked(userId, sessionId));
+        messagePublisher.publish(new SessionRevoked(userId, sessionId, Instant.now()));
     }
 
     /**

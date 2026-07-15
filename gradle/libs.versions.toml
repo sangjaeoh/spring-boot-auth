@@ -45,6 +45,8 @@ spring-context = { module = "org.springframework:spring-context" }
 spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure" }
 # slf4j API(버전은 BOM). 스타터를 끌지 않는 모듈이 로깅할 때 컴파일 클래스패스에 명시한다.
 slf4j-api = { module = "org.slf4j:slf4j-api" }
+# Jackson 3(tools.jackson) — 통합 이벤트 페이로드 직렬화(infra-messaging). 버전은 BOM(jackson-bom)이 관리.
+jackson-databind = { module = "tools.jackson.core:jackson-databind" }
 bouncycastle-provider = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 # SB4는 TestRestTemplate을 spring-boot-resttestclient 모듈로 분리했다(starter-test 미포함).

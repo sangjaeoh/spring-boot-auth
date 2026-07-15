@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.auth.common.core.crypto.PasswordHasher;
 import com.example.auth.common.jpa.config.JpaConfig;
+import com.example.auth.common.messaging.MessagePublisher;
 import com.example.auth.domain.auth.entity.HashAlgorithm;
 import com.example.auth.domain.auth.entity.PasswordCredential;
 import com.example.auth.domain.auth.exception.AuthException;
@@ -17,7 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -94,10 +94,10 @@ class PasswordHistoryIT {
     static class TestBeans {
 
         @Bean
-        PasswordCredentialModifier passwordCredentialModifier(
-                PasswordCredentialRepository repository, ApplicationEventPublisher eventPublisher) {
+        PasswordCredentialModifier passwordCredentialModifier(PasswordCredentialRepository repository) {
+            MessagePublisher noopPublisher = event -> {};
             return new PasswordCredentialModifier(
-                    repository, FAKE_HASHER, new PasswordPolicyValidator(8), eventPublisher, HISTORY_LIMIT);
+                    repository, FAKE_HASHER, new PasswordPolicyValidator(8), noopPublisher, HISTORY_LIMIT);
         }
     }
 }

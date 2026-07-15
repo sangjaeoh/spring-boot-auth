@@ -20,7 +20,7 @@
 ## 인증 수단·세션 통제 (Phase 2·3)
 
 - [x] **3. 소셜 로그인 4종 + 연동/해제** — 카카오/네이버/구글/애플 OIDC(`external-social` 신설, dev Mock) + 소셜 최초 로그인 온보딩(SOCIAL 스텝셋·CreateUser 재사용) + ≥1 로그인 수단 유지(동시 해제 직렬화) + 애플 특수사항(.p8 동적 client_secret·릴레이 이메일).
-- [ ] **4. 이벤트 인프라(common-messaging·infra-messaging)** — 현재 이벤트는 in-process ApplicationEventPublisher + 구조적 로깅뿐. MessagePublisher 포트 + 통합 이벤트 공개 스키마(단조 version·occurredAt) + 멱등 소비 + 내구 재시도(DLQ). 5~8의 크로스 도메인 발행·소비 전제.
+- [x] **4. 이벤트 인프라(common-messaging·infra-messaging)** — 현재 이벤트는 in-process ApplicationEventPublisher + 구조적 로깅뿐. MessagePublisher 포트 + 통합 이벤트 공개 스키마(단조 version·occurredAt) + 멱등 소비 + 내구 재시도(DLQ). 5~8의 크로스 도메인 발행·소비 전제.
 - [ ] **5. 디바이스 + 다중 로그인 제한 + 강제/원격 로그아웃** — Device 애그리거트(현재 세션의 deviceId는 placeholder)·기기 인식·동시 세션 ≤3 원자 검증 + 최오래 축출·내 세션 목록/원격 로그아웃 API·기기 삭제→세션 종료·ForceLogoutRequested 소비·revoke failover 유실 차단(WAIT, 1a 이연분).
 
 ## 회원 생명주기·컴플라이언스 (Phase 4)

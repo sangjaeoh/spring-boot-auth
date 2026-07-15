@@ -14,5 +14,6 @@ spring:
 
 app:
   migration:
-    # 이 앱이 조립하는 도메인 스키마(각 도메인이 db/migration/{schema} 소유). 스키마 추가 시 여기에 등록.
-    schemas: auth,usr
+    # 이 앱이 조립하는 스키마(각 소유 모듈이 db/migration/{schema} 소유). 스키마 추가 시 여기에 등록.
+    # msg는 infra-messaging 소유(디둡·DLQ) — 도메인 스키마가 아닌 메시징 기술 스키마다.
+    schemas: auth,usr,msg

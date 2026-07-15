@@ -7,4 +7,6 @@ plugins {
 dependencies {
     implementation(project(":module-common:common-core"))
     implementation(project(":module-common:common-jpa"))
+    // 통합 이벤트 공개 스키마(IntegrationEvent)·발행 포트(MessagePublisher).
+    implementation(project(":module-common:common-messaging"))
 }

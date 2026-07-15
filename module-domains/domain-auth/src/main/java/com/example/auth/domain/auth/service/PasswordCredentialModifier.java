@@ -1,6 +1,7 @@
 package com.example.auth.domain.auth.service;
 
 import com.example.auth.common.core.crypto.PasswordHasher;
+import com.example.auth.common.messaging.MessagePublisher;
 import com.example.auth.domain.auth.entity.HashAlgorithm;
 import com.example.auth.domain.auth.entity.PasswordCredential;
 import com.example.auth.domain.auth.event.PasswordChanged;
@@ -11,7 +12,6 @@ import com.example.auth.domain.auth.repository.PasswordCredentialRepository;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,19 +29,19 @@ public class PasswordCredentialModifier {
     private final PasswordCredentialRepository repository;
     private final PasswordHasher passwordHasher;
     private final PasswordPolicyValidator policyValidator;
-    private final ApplicationEventPublisher eventPublisher;
+    private final MessagePublisher messagePublisher;
     private final int historyLimit;
 
     public PasswordCredentialModifier(
             PasswordCredentialRepository repository,
             PasswordHasher passwordHasher,
             PasswordPolicyValidator policyValidator,
-            ApplicationEventPublisher eventPublisher,
+            MessagePublisher messagePublisher,
             @Value("${auth.password.history-size:5}") int historyLimit) {
         this.repository = repository;
         this.passwordHasher = passwordHasher;
         this.policyValidator = policyValidator;
-        this.eventPublisher = eventPublisher;
+        this.messagePublisher = messagePublisher;
         this.historyLimit = historyLimit;
     }
 
@@ -57,7 +57,7 @@ public class PasswordCredentialModifier {
             throw new AuthException(AuthErrorCode.CURRENT_PASSWORD_MISMATCH);
         }
         applyNewPassword(credential, newRaw, now);
-        eventPublisher.publishEvent(new PasswordChanged(userId));
+        messagePublisher.publish(new PasswordChanged(userId, now));
     }
 
     /**
@@ -69,7 +69,7 @@ public class PasswordCredentialModifier {
     public void resetTo(UUID userId, String newRaw, Instant now) {
         PasswordCredential credential = getCredential(userId);
         applyNewPassword(credential, newRaw, now);
-        eventPublisher.publishEvent(new PasswordResetCompleted(userId));
+        messagePublisher.publish(new PasswordResetCompleted(userId, now));
     }
 
     private void applyNewPassword(PasswordCredential credential, String newRaw, Instant now) {

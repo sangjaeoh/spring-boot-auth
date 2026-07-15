@@ -1,0 +1,9 @@
+spring:
+  flyway:
+    locations: classpath:db/migration/msg
+    schemas: msg
+
+messaging:
+  dlq:
+    # 백그라운드 폴이 테스트의 수동 재시도와 경합하지 않도록 폴 주기를 테스트 밖으로 밀어낸다.
+    poll-interval: PT1H
