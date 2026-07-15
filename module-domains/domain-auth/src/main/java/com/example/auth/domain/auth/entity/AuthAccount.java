@@ -60,6 +60,13 @@ public class AuthAccount extends BaseTimeEntity<UUID> {
         return userStatus == LifecycleStatus.ACTIVE && lockState == LockState.NONE;
     }
 
+    /**
+     * 로그인 식별자를 변경한다(연락용 {@code contactEmail}과 독립). 유일성은 유니크 인덱스가 backstop한다.
+     */
+    public void changeLoginEmail(Email newEmail) {
+        this.loginEmail = newEmail;
+    }
+
     @Override
     public UUID getId() {
         return userId;

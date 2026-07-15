@@ -17,6 +17,7 @@ import com.example.auth.domain.user.repository.NotificationPreferenceRepository;
 import com.example.auth.domain.user.service.TermsVersionAppender;
 import java.time.Instant;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -166,7 +167,7 @@ class ConsentApiE2EIT {
         return requireNonNull(response.getBody());
     }
 
-    private HttpEntity<Object> withBearer(TokenResponse tokens, Object body) {
+    private HttpEntity<Object> withBearer(TokenResponse tokens, @Nullable Object body) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(tokens.accessToken());
         return new HttpEntity<>(body, headers);
