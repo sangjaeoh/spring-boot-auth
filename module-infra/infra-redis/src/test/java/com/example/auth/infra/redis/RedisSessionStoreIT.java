@@ -1,14 +1,22 @@
 package com.example.auth.infra.redis;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 
 import com.example.auth.domain.auth.port.RotationResult;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.RedisSystemException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -36,6 +44,13 @@ class RedisSessionStoreIT {
 
     @Autowired
     private RedisSessionStore store;
+
+    @Autowired
+    private StringRedisTemplate template;
+
+    @Autowired
+    @Qualifier("rotateSessionScript")
+    private RedisScript<String> rotateScript;
 
     @Test
     void createsValidatesAndRevokes() {
@@ -132,6 +147,38 @@ class RedisSessionStoreIT {
     @Test
     void rotateRejectsUnknownToken() {
         assertThat(store.rotate("nope", "new", "plain", Instant.now(), GRACE, TTL)
+                        .type())
+                .isEqualTo(RotationResult.RotationType.INVALID);
+    }
+
+    @Test
+    void returnsRotatedEvenWhenRefIndexUpdateFailsAfterAtomicRotation() {
+        // create의 refidx set은 통과시키고, 회전이 Lua로 확정된 뒤의 refidx set에만 Redis 예외를 주입한다
+        // (닫힌 포트 테스트는 첫 홉에서 끝나 이 분기를 못 태운다). ValueOperations.set 두 번째 호출만 실패.
+        StringRedisTemplate spyTemplate = Mockito.spy(template);
+        ValueOperations<String, String> spyValueOps = Mockito.spy(template.opsForValue());
+        Mockito.doReturn(spyValueOps).when(spyTemplate).opsForValue();
+        Mockito.doCallRealMethod()
+                .doThrow(new RedisSystemException("injected", new RuntimeException()))
+                .when(spyValueOps)
+                .set(anyString(), anyString(), any(Duration.class));
+        RedisSessionStore failingRefIndexStore = new RedisSessionStore(spyTemplate, rotateScript);
+
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        Instant now = Instant.now();
+        failingRefIndexStore.create(userId, sessionId, null, "1.2.3.4", null, "jti-A", "plain-A", now, TTL);
+
+        RotationResult rotated = failingRefIndexStore.rotate("jti-A", "jti-B", "plain-B", now, GRACE, TTL);
+
+        // 회전은 이미 원자 확정됐으므로 refidx set 실패가 503/오탐 REUSE로 오보되지 않는다.
+        assertThat(rotated.type()).isEqualTo(RotationResult.RotationType.ROTATED);
+        assertThat(rotated.refreshPlain()).isEqualTo("plain-B");
+        assertThat(failingRefIndexStore.validate(userId, sessionId, now)).isTrue();
+
+        // refidx:jti-B 부재 → 다음 회전은 INVALID(귀결: 다음 회전 시 재로그인). fail-open 없음.
+        assertThat(failingRefIndexStore
+                        .rotate("jti-B", "jti-C", "plain-C", now, GRACE, TTL)
                         .type())
                 .isEqualTo(RotationResult.RotationType.INVALID);
     }
