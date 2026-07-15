@@ -14,7 +14,8 @@ public enum UserErrorCode implements ErrorCode {
     TERMS_TYPE_NOT_FOUND("USER_TERMS_TYPE_NOT_FOUND", "약관 유형이 존재하지 않습니다.", 404),
     REQUIRED_CONSENT_WITHDRAWAL("USER_REQUIRED_CONSENT_WITHDRAWAL", "필수 약관은 철회할 수 없습니다. 탈퇴 절차를 이용해주세요.", 400),
     CONSENT_NOT_FOUND("USER_CONSENT_NOT_FOUND", "철회할 동의가 존재하지 않습니다.", 404),
-    SECURITY_CHANNEL_REQUIRED("USER_SECURITY_CHANNEL_REQUIRED", "보안 알림은 이메일·SMS 중 최소 한 채널을 유지해야 합니다.", 400);
+    SECURITY_CHANNEL_REQUIRED("USER_SECURITY_CHANNEL_REQUIRED", "보안 알림은 이메일·SMS 중 최소 한 채널을 유지해야 합니다.", 400),
+    USER_NOT_FOUND("USER_NOT_FOUND", "회원이 존재하지 않습니다.", 404);
 
     private final String code;
     private final String message;

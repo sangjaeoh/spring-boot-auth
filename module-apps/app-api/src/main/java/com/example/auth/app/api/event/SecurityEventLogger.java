@@ -1,6 +1,7 @@
 package com.example.auth.app.api.event;
 
 import com.example.auth.domain.auth.event.LoggedIn;
+import com.example.auth.domain.auth.event.LoginEmailChanged;
 import com.example.auth.domain.auth.event.LoginFailed;
 import com.example.auth.domain.auth.event.PasswordChanged;
 import com.example.auth.domain.auth.event.PasswordResetCompleted;
@@ -65,5 +66,10 @@ public class SecurityEventLogger {
     @EventListener
     public void onSocialDisconnected(SocialDisconnected event) {
         log.info("소셜 연동 해제 userId={} provider={}", event.userId(), event.provider());
+    }
+
+    @EventListener
+    public void onLoginEmailChanged(LoginEmailChanged event) {
+        log.info("로그인 이메일 변경 userId={}", event.userId());
     }
 }

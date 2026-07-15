@@ -63,6 +63,13 @@ public class User extends BaseTimeEntity<UUID> {
         return new User(UuidV7Generator.generate(), profile, contact, contactPhoneBidx, ciHash);
     }
 
+    /**
+     * 연락용 이메일을 변경한다(휴대폰 유지). 로그인 식별자({@code loginEmail})와 독립이다.
+     */
+    public void changeContactEmail(Email newEmail) {
+        this.contact = Contact.of(newEmail, contact.contactPhone());
+    }
+
     @Override
     public UUID getId() {
         return id;

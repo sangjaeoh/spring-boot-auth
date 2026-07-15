@@ -1,6 +1,8 @@
 package com.example.auth.domain.auth.service;
 
 import com.example.auth.domain.auth.entity.Email;
+import com.example.auth.domain.auth.exception.AuthErrorCode;
+import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.info.LoginAccountInfo;
 import com.example.auth.domain.auth.repository.AuthAccountRepository;
 import java.util.Optional;
@@ -34,5 +36,18 @@ public class AuthAccountReader {
     @Transactional(readOnly = true)
     public Optional<LoginAccountInfo> findForLogin(UUID userId) {
         return repository.findById(userId).map(LoginAccountInfo::from);
+    }
+
+    /**
+     * 계정의 로그인 이메일 원문을 반환한다(내 정보 조회용 — 표시 마스킹은 호출측 정책).
+     *
+     * @throws AuthException 미존재 계정이면(404)
+     */
+    @Transactional(readOnly = true)
+    public String getLoginEmail(UUID userId) {
+        return repository
+                .findById(userId)
+                .map(account -> account.getLoginEmail().value())
+                .orElseThrow(() -> new AuthException(AuthErrorCode.ACCOUNT_NOT_FOUND));
     }
 }
