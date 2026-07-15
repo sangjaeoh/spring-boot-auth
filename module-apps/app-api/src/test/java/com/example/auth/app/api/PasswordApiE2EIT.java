@@ -11,7 +11,7 @@ import com.example.auth.app.api.presentation.v1.PasswordResetCompleteRequest;
 import com.example.auth.app.api.presentation.v1.PasswordResetInitiateRequest;
 import com.example.auth.app.api.presentation.v1.PasswordResetInitiateResponse;
 import com.example.auth.app.api.presentation.v1.TokenResponse;
-import com.example.auth.external.notification.MockNotificationSender;
+import com.example.auth.external.notification.MockVerificationCodeSender;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -57,7 +57,7 @@ class PasswordApiE2EIT {
     private AccountProvisioningFacade provisioning;
 
     @Autowired
-    private MockNotificationSender notificationSender;
+    private MockVerificationCodeSender verificationCodeSender;
 
     @Test
     void resetSetsNewPasswordAndRevokesExistingSessions() {
@@ -71,7 +71,7 @@ class PasswordApiE2EIT {
                 PasswordResetInitiateResponse.class);
         assertThat(initiated.getStatusCode().value()).isEqualTo(200);
         String challengeId = requireNonNull(initiated.getBody()).challengeId();
-        String code = requireNonNull(notificationSender.lastContent(email));
+        String code = requireNonNull(verificationCodeSender.lastContent(email));
 
         ResponseEntity<Void> completed = rest.postForEntity(
                 "/auth/password/reset/complete",
@@ -119,7 +119,7 @@ class PasswordApiE2EIT {
                 new PasswordResetInitiateRequest(email),
                 PasswordResetInitiateResponse.class);
         String challengeId = requireNonNull(initiated.getBody()).challengeId();
-        String code = requireNonNull(notificationSender.lastContent(email));
+        String code = requireNonNull(verificationCodeSender.lastContent(email));
 
         // 새 비번이 현재 비번(이력 내)과 동일 → 재사용 400. 코드는 검증 단계에서 이미 소진된다.
         ResponseEntity<String> reuse = rest.postForEntity(

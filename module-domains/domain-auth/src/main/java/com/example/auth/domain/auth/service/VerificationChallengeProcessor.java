@@ -3,8 +3,8 @@ package com.example.auth.domain.auth.service;
 import com.example.auth.common.core.crypto.TokenHasher;
 import com.example.auth.common.core.id.UuidV7Generator;
 import com.example.auth.domain.auth.port.NotificationChannel;
-import com.example.auth.domain.auth.port.NotificationSender;
 import com.example.auth.domain.auth.port.VerificationChallengeStore;
+import com.example.auth.domain.auth.port.VerificationCodeSender;
 import com.example.auth.domain.auth.port.VerificationResult;
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -24,7 +24,7 @@ public class VerificationChallengeProcessor {
 
     private final VerificationChallengeStore store;
     private final TokenHasher tokenHasher;
-    private final NotificationSender notificationSender;
+    private final VerificationCodeSender verificationCodeSender;
     private final SecureRandom random = new SecureRandom();
     private final Duration codeTtl;
     private final int maxAttempts;
@@ -33,13 +33,13 @@ public class VerificationChallengeProcessor {
     public VerificationChallengeProcessor(
             VerificationChallengeStore store,
             TokenHasher tokenHasher,
-            NotificationSender notificationSender,
+            VerificationCodeSender verificationCodeSender,
             @Value("${auth.verification.code-ttl-minutes:5}") long codeTtlMinutes,
             @Value("${auth.verification.max-attempts:5}") int maxAttempts,
             @Value("${auth.verification.code-digits:6}") int codeDigits) {
         this.store = store;
         this.tokenHasher = tokenHasher;
-        this.notificationSender = notificationSender;
+        this.verificationCodeSender = verificationCodeSender;
         this.codeTtl = Duration.ofMinutes(codeTtlMinutes);
         this.maxAttempts = maxAttempts;
         this.codeDigits = codeDigits;
@@ -52,7 +52,7 @@ public class VerificationChallengeProcessor {
         String challengeId = UuidV7Generator.generate().toString();
         String code = generateCode();
         store.issue(challengeId, subjectId, tokenHasher.hash(code), codeTtl, maxAttempts);
-        notificationSender.send(channel, target, code);
+        verificationCodeSender.send(channel, target, code);
         return challengeId;
     }
 
