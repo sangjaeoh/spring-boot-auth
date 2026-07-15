@@ -25,7 +25,7 @@ import com.example.auth.domain.auth.service.RegistrationSessionProcessor;
 import com.example.auth.domain.user.entity.Carrier;
 import com.example.auth.domain.user.entity.Gender;
 import com.example.auth.domain.user.entity.TermsType;
-import com.example.auth.external.notification.MockNotificationSender;
+import com.example.auth.external.notification.MockVerificationCodeSender;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +83,7 @@ class OnboardingApiE2EIT {
     private TestRestTemplate rest;
 
     @Autowired
-    private MockNotificationSender notificationSender;
+    private MockVerificationCodeSender verificationCodeSender;
 
     @Autowired
     private RegistrationSessionProcessor registrationSessionProcessor;
@@ -192,7 +192,7 @@ class OnboardingApiE2EIT {
         String email = "onboard-cross@example.com";
         RegistrationStartResponse started = start(email);
         String phoneChallengeId = requestPhoneChallenge(started, PHONE);
-        String smsCode = requireNonNull(notificationSender.lastContent(PHONE));
+        String smsCode = requireNonNull(verificationCodeSender.lastContent(PHONE));
 
         // SMS 챌린지(코드까지 정답)를 이메일 스텝에 제출 — 종별 바인딩 불일치로 거부돼야 한다.
         ResponseEntity<String> crossed = rest.postForEntity(
@@ -275,7 +275,7 @@ class OnboardingApiE2EIT {
     }
 
     private void verifyEmailStep(RegistrationStartResponse started, String email) {
-        String code = requireNonNull(notificationSender.lastContent(email));
+        String code = requireNonNull(verificationCodeSender.lastContent(email));
         ResponseEntity<Void> response = rest.postForEntity(
                 "/auth/registration/email/verify",
                 new RegistrationCodeVerifyRequest(
@@ -294,7 +294,7 @@ class OnboardingApiE2EIT {
     }
 
     private void verifyPhoneStep(RegistrationStartResponse started, String challengeId, String phone) {
-        String code = requireNonNull(notificationSender.lastContent(phone));
+        String code = requireNonNull(verificationCodeSender.lastContent(phone));
         ResponseEntity<Void> response = rest.postForEntity(
                 "/auth/registration/phone/verify",
                 new RegistrationCodeVerifyRequest(

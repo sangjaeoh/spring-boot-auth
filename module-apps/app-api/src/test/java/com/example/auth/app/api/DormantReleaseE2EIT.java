@@ -12,7 +12,7 @@ import com.example.auth.app.api.presentation.v1.LoginRequest;
 import com.example.auth.app.api.presentation.v1.TokenResponse;
 import com.example.auth.domain.auth.service.AuthAccountModifier;
 import com.example.auth.domain.user.repository.UserRepository;
-import com.example.auth.external.notification.MockNotificationSender;
+import com.example.auth.external.notification.MockVerificationCodeSender;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -66,7 +66,7 @@ class DormantReleaseE2EIT {
     private AuthAccountModifier authAccountModifier;
 
     @Autowired
-    private MockNotificationSender notificationSender;
+    private MockVerificationCodeSender verificationCodeSender;
 
     @Autowired
     private PlatformTransactionManager transactionManager;
@@ -110,7 +110,7 @@ class DormantReleaseE2EIT {
         assertThat(loginRaw(email, "secret123").getStatusCode().value()).isEqualTo(403);
 
         // 올바른 코드 → 해제 → 직후 정상 로그인.
-        String code = requireNonNull(notificationSender.lastContent(email));
+        String code = requireNonNull(verificationCodeSender.lastContent(email));
         ResponseEntity<Void> released = rest.postForEntity(
                 "/auth/dormant-release/verify",
                 new DormantReleaseVerifyRequest(issued.challengeId(), code),
