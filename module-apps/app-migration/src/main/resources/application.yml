@@ -3,6 +3,16 @@ spring:
     url: jdbc:postgresql://localhost:5432/auth
     username: auth
     password: auth
-  flyway:
-    # 기존 스키마에도 이력 테이블을 세운다. 도메인별 로케이션·스키마는 Phase 1에서 배선한다.
-    baseline-on-migrate: true
+  autoconfigure:
+    # 다중 스키마는 SchemaFlywayFactory가 스키마별로 실행한다. Boot 단일 Flyway는 db/migration 하위를 재귀
+    # 스캔해 auth V1·usr V1을 한 history로 봐 버전 충돌하므로 끈다. Hibernate/JPA는 이 앱에 불필요(런타임 데이터
+    # 접근 없음)하나 도메인 runtimeOnly 의존이 전이하므로 함께 끈다. (SB4 auto-config 모듈분리 FQN)
+    exclude:
+      - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
+      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
+      - org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration
+
+app:
+  migration:
+    # 이 앱이 조립하는 도메인 스키마(각 도메인이 db/migration/{schema} 소유). 스키마 추가 시 여기에 등록.
+    schemas: auth,usr

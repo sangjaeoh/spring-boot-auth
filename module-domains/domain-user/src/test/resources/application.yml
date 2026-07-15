@@ -1,0 +1,9 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    # 단일 스키마 usr → Boot Flyway로 충분. 멀티 스키마(auth+usr) 팩토리는 app-migration이 실증한다.
+    locations: classpath:db/migration/usr
+    schemas: usr
