@@ -16,6 +16,10 @@ spring:
     redis:
       host: localhost
       port: 6379
+      # 정상 연결의 명령 타임아웃 상한 — 멈춘 노드(부분 failover)에서 fail-closed 지연을 유계로 만든다.
+      # 연결단 stall(connectTimeout)·재연결 큐잉(disconnectedBehavior)은 별도이며 Lettuce 옵션 후속(REDIS_HA.md).
+      # prod Cluster 노드 접속(spring.data.redis.cluster.nodes 등)은 배포 오버레이가 소유.
+      timeout: 250ms
 
 auth:
   jwt:

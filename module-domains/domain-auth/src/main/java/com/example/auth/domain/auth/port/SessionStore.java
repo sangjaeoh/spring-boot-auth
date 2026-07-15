@@ -10,7 +10,12 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Redis 애그리거트라 Spring Data 포트가 성립하지 않는 예외 지점이다(IMPLEMENTATION_PLAN §1) — 도메인이
  * 포트를 선언하고 infra-redis가 Lua 원자성으로 구현한다. 모든 연산은 {@code userId} 슬롯 국소라 Cluster
- * 원자성을 보존한다. 저장소 예외는 fail-closed(검증 실패)로 처리한다.
+ * 원자성을 보존한다.
+ *
+ * <p>저장소 불가 시 페일 모드는 판정 지점별로 갈린다 — {@link #validate}는 fail-closed로 {@code false}를
+ * 반환해 서명이 유효한 토큰도 거부되게 하고(가용성보다 실시간 무효화), 쓰기·회전({@link #create}·
+ * {@link #rotate}·{@link #revoke}·{@link #revokeAll})은 {@code AuthErrorCode.SESSION_STORE_UNAVAILABLE}(503)로
+ * 실패해 토큰을 발급하지 않는다(재시도 가능·유효 토큰 미폐기).
  */
 public interface SessionStore {
 

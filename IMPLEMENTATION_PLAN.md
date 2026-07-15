@@ -202,7 +202,7 @@ P1b의 최소 슬라이스를 정식 기능으로 확장한다.
 한 줄 언급이 아니라 단계 배정·오너·검증을 갖는 1급 항목이다.
 
 - **PII 암호화·조회(P1 확정)**: AES-GCM **envelope 암호화 + 데이터키 캐싱**(KMS-per-op 비용/지연 회피), **암호문에 키 버전(key id)** 동봉(회전 시 전행 재암호화 회피), `ciHash`·전화 등 조회 필요 PII는 **blind index(HMAC+pepper) + pepper 버전 스킴**(pepper 회전이 유일성/조회를 깨지 않게). 대상 컬럼은 `DOMAIN_MODEL` 영속 유의절이 소유.
-- **Redis HA(P1 확정)**: 세션=요청 100% 핫패스이자 진실원본. 토폴로지(Sentinel/Cluster)·AOF 지속성·**Lua 원자연산 keyslotting(단일 슬롯 hash tag)**·**failover 시 무효화 유실로 revoke 세션 부활 방지**·다운 시 fail-closed/open 정책을 P1a 전에 확정. 미결 시 단일 장애점.
+- **Redis HA(P1a에서 확정 — [`REDIS_HA.md`](REDIS_HA.md))**: 세션=요청 100% 핫패스이자 진실원본. 토폴로지=Cluster, AOF 지속성, **Lua keyslotting(단일 슬롯 hash tag)은 테스트가 강제**, **failover revoke 유실 방지**(min-replicas로 창 축소, 완전 차단은 WAIT 후속), 다운 시 fail-closed(읽기=검증 거부·쓰기=503) 정책을 결정문서 + 운영설정으로 명문화·코드로 강제.
 - **이벤트(D3)**: 통합 이벤트 스키마 공개·안정 + 멱등 소비자 + 내구 재시도(DLQ). 아웃박스 릴레이는 브로커/물리 분리 시.
 - **보존·파기**: `RetentionPolicy` 외부화·데이터 소유=파기 소유. append-only 3종은 PII만 crypto-shred/가명화. P4 batch 집행.
 - **관측성·SLO**: 로그인 p99·가용성 SLO, seam 넘는 분산 트레이싱, **보안 탐지 지표**(재사용 감지 급증·잠금율·회전 이상) 대시보드·알럿. P1부터 증분.
@@ -218,7 +218,7 @@ P1b의 최소 슬라이스를 정식 기능으로 확장한다.
 
 - **D6(저장소 토폴로지) — 확정**: 단일 PostgreSQL·스키마 분리(사용자 승인). 온보딩·탈퇴는 단일 트랜잭션으로 원자화돼 사가·고아·복구 원장이 불필요하다. **물리 별도 DB로 분리하는 순간이 사가 재도입 지점** — 그때 "영속 PENDING 금지 vs 내구 재생 소스 필요" 긴장을 유저측 멱등 원장(RegistrationId 디둡) + credential 재료 내구 보관으로 화해시킨다(CI 유니크만으론 부분성공+TTL만료 고아를 못 막음).
 - **외부 조달 리드타임 — 크리티컬 패스**: 본인인증 계약·소셜 심사·Apple Developer·법무는 기술 선행조건이 아니라 수 주~수개월 리드타임. P0와 병렬로 지금 시작(§4 P0-6). 지연 시 P2/P4가 밀린다.
-- **Redis 진실원본의 failover 정합**: 비동기 복제 환경에서 무효화가 유실되면 제품 명제(실시간 강제 로그아웃)가 깨진다. §5 게이트로 P1a 전 해소.
+- **Redis 진실원본의 failover 정합 — 해소([`REDIS_HA.md`](REDIS_HA.md))**: 비동기 복제 환경에서 무효화가 유실되면 제품 명제(실시간 강제 로그아웃)가 깨진다. 결정문서로 정책 확정(min-replicas 창 축소, WAIT/WAITAOF 완전 차단은 P3/P5 revoke 소비자와 함께). 코드는 fail-closed·keyslotting을 강제하고, 회전 부분성공 창을 문서화된 위협으로 등재.
 - **JWT vs opaque**: 매 요청 Redis를 치므로 JWT 무상태 이점은 상당 부분 상쇄된다(실이득=roles/sid 클레임으로 유저 조회 회피). 도메인 모델이 의도적으로 채택했으나, P1a에서 실측으로 이점을 정량화해 유지/재고를 판단한다.
 - **D5 공격면(미래 분리 노트)**: PII 유저 도메인과 인터넷 대면 인증이 한 JVM에 있으면 인증 프로세스 침해가 in-process로 PII 복호화에 닿는다. 물리 분리 시 우선 격리 대상으로 기록.
 - **KMS 장애 런북**: 복호화 불가 시 본인인증·조회 마비 거동을 온콜 런북에 명시.
@@ -238,7 +238,9 @@ P0(하네스, 타임박스 + 조달 병렬) → P1a(핫패스 MVP) → P1b(최�
     - **운영 수용(이연의 귀결, 배포 전 필수 인지)**: 자동 90일 회전 트리거는 의도적 미배선(인메모리 키 위 타이머는 실효 없음). 그 귀결 — (1) 앱 재시작/재배포마다 서명키가 새 kid로 바뀌어 직전 발급 Access(≤15분)가 재시작 직후 401, (2) **단일 인스턴스 한정 정확**(다중 인스턴스는 키·JWKS 불일치로 상호 검증 실패). 둘 다 자동회전·내구 저장·시크릿매니저 주입을 함께 도입하는 후속 워크스트림이 해소. `rotate()` 메커니즘은 그 seam으로 존재·테스트됨.
   - [x] **1a Argon2 동시성 바운드 실행기 + 용량모델 슬라이스** — `ConcurrencyLimiter`(infra-crypto, fair Semaphore·`tryAcquire(timeout)` → 포화 시 `HashingCapacityException` 503, **획득 성공 시에만 permit 반환**·인터럽트 시 플래그 복원+전파(503 마스킹 금지))로 `Argon2PasswordHasher.hash/matches`를 감싸 동시 Argon2를 상한 → 로그인 폭주 시 메모리 폭주(N×~19MB)·CPU 스래싱 방지. 용량모델: `max-concurrent`(0=auto=가용 코어수)·`acquire-timeout-ms`(500), peak Argon2 힙 ≈ permits×memory-kb. `CryptoErrorCode`(HASHING_CAPACITY_EXCEEDED=503)·`HashingCapacityException`은 common-core(포트 계약의 백프레셔 실패 모드) → 기존 `GlobalExceptionHandler`가 503 매핑. 53 테스트 green(barrier 결정적 동시상한=permits·포화차단+permit 누수 없음·예외후 반환·인터럽트 복원). 설계→콜드 설계리뷰(YELLOW)→구현→콜드 코드리뷰(GREEN, 블로킹 0)→MINOR 반영.
     - **결정·이연의 귀결**: (1) 전용 스레드풀 아닌 세마포어 채택 — VT 미설정이라 캐리어 피닝 없음, 실 위험=메모리·CPU를 세마포어가 상한. **VT(`spring.threads.virtual.enabled`) 활성 시 세마포어는 캐리어 피닝을 못 막으므로 전용 플랫폼-스레드 실행기로 교체 필요**(코드 주석에 트리거 명문화). (2) change/resetTo는 tx 내부 KDF라 리미터 포화 시 최악 (historyLimit+2)×타임아웃≈3.5s 커넥션 점유 가능 — 저동시성이라 유계로 수용, **후속 백로그**: change/resetTo KDF를 로그인처럼 tx 밖으로. (3) 실 부하(메모리/지연 실측)는 §5 성능·용량 운영 워크스트림(CI 단위테스트 아님).
-  - **1a 내 남은 슬라이스(다음 착수, 횡단 게이트)**: Redis HA/failover 정합(Sentinel/Cluster·AOF·failover 시 revoke 유실로 세션 부활 방지·fail-closed·Lua keyslotting).
+  - [x] **1a Redis HA/failover 정합 슬라이스(마지막 횡단 게이트) — DONE** — 범위: fail-closed 핫패스 + Lua keyslotting 검증 + failover 결정문서(사용자 확정, 토폴로지=Cluster). (a) `RedisSessionStore` 쓰기·회전(`create`·`rotate`·`revoke`·`revokeAll`)을 Redis 불가 시 `AuthErrorCode.SESSION_STORE_UNAVAILABLE`(503)로 fail-closed(읽기 `validate`는 기존대로 false→401 유지). 회전은 GET·Lua만 503으로 감싸고 **ROTATED 확정 후 refidx SET은 best-effort**로 분리(완료된 회전을 503/오탐 REUSE로 오보 방지 — 콜드 설계리뷰 M1). (b) `SessionKeys`로 키 스키마 추출 + `SessionKeysTest`가 회전 Lua가 만지는 전 키의 단일 슬롯을 `ClusterSlotHashUtil`로 강제. (c) [`REDIS_HA.md`](REDIS_HA.md)에 토폴로지·AOF·min-replicas·fail-closed/open·타임아웃·회전 부분성공 창·클라 계약 명문화 + `spring.data.redis.timeout: 250ms`. 60 테스트 green(fail-closed 4 + revokeAll 503 + refidx-실패 회전 + keyslot 2). 설계→콜드 설계리뷰(M1 반영)→구현→콜드 코드리뷰(BLOCKING 0, M1 refidx 분기 테스트 보강)→반영.
+    - **결정·이연의 귀결**: (1) 토폴로지=Cluster(해시태그 이미 배선, dev/test는 단일 노드). (2) failover revoke 유실 완전 차단(WAIT/WAITAOF)은 강제 로그아웃 소비자 P3·잠금 P5와 함께 배선(현재는 정책 명문화). (3) `revokeAll` 단일 Lua 원자화·Lettuce 연결단 타임아웃(`connectTimeout`/`disconnectedBehavior`)은 후속. (4) 회전 부분성공 창(ROTATED 후 refidx SET 실패→다음 회전 재로그인)은 refidx가 슬롯 밖일 수밖에 없는 구조상 내재적 — fail-open 아니라 재로그인 강등으로 수용.
+  - **→ Phase 1a 마감.** 인증 핫패스·비밀번호 생명주기·JWKS 90일 회전·Argon2 바운드 실행기·Redis HA/failover 정합 전부 완료·머지. 다음 착수는 Phase 1b(최소 로컬 온보딩).
 - [ ] **Phase 1b** — 최소 로컬 온보딩(`RegistrationSession`·`VerificationChallenge`·최소 `Terms`/`Consent` 시드·Mock 본인인증·`CiRegistry`·`User`), `CreateUser` 단일 크로스스키마 트랜잭션. `usr` 스키마 등장 → `SchemaFlywayFactory`·PII envelope 암호화·전화 blind index 이 단계에서 배선.
 - [ ] **Phase 2** — 소셜 로그인 4종 + 연동/해제
 - [ ] **Phase 3** — 디바이스 + 다중 로그인 제한(동시 세션 ≤N·최오래 축출) + 강제/원격 로그아웃
