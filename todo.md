@@ -15,7 +15,7 @@
 ## 게이트·코어 완성 (요구사항 Phase 1 마감)
 
 - [ ] **1. CI 파이프라인** — `.github` 부재로 품질 게이트(Spotless·NullAway·Error Prone·ArchUnit·Testcontainers 테스트)가 로컬 `./gradlew build`에만 존재. GitHub Actions push/PR 게이트 강제.
-- [ ] **2. 가입 완료 — CreateUser 단일 크로스스키마 트랜잭션** — 온보딩 `complete()`와 시드 전용 프로비저닝 파사드만 있고 정회원 커밋 라우트가 없다. usr(User·ConsentRecord append·CiRegistry.link 유니크 hard-enforce·IdentityVerification 연결) + auth(AuthAccount·PasswordCredential)를 한 ACID 트랜잭션으로 원자 생성. **이 항목 완료 = 요구사항 Phase 1(코어 로컬 인증 MVP) 완성**
+- [x] **2. 가입 완료 — CreateUser 단일 크로스스키마 트랜잭션** — 온보딩 `complete()`와 시드 전용 프로비저닝 파사드만 있고 정회원 커밋 라우트가 없다. usr(User·ConsentRecord append·CiRegistry.link 유니크 hard-enforce·IdentityVerification 연결) + auth(AuthAccount·PasswordCredential)를 한 ACID 트랜잭션으로 원자 생성. **이 항목 완료 = 요구사항 Phase 1(코어 로컬 인증 MVP) 완성**
 
 ## 인증 수단·세션 통제 (Phase 2·3)
 

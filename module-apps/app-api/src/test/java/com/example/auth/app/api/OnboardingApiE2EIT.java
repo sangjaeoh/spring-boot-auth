@@ -8,10 +8,15 @@ import com.example.auth.app.api.presentation.v1.ChallengeResponse;
 import com.example.auth.app.api.presentation.v1.ConsentsRequest;
 import com.example.auth.app.api.presentation.v1.EmailChallengeRequest;
 import com.example.auth.app.api.presentation.v1.IdentityVerifyRequest;
+import com.example.auth.app.api.presentation.v1.LoginRequest;
+import com.example.auth.app.api.presentation.v1.MeResponse;
 import com.example.auth.app.api.presentation.v1.PhoneChallengeRequest;
 import com.example.auth.app.api.presentation.v1.RegistrationCodeVerifyRequest;
+import com.example.auth.app.api.presentation.v1.RegistrationCompleteRequest;
+import com.example.auth.app.api.presentation.v1.RegistrationCompleteResponse;
 import com.example.auth.app.api.presentation.v1.RegistrationStartRequest;
 import com.example.auth.app.api.presentation.v1.RegistrationStartResponse;
+import com.example.auth.app.api.presentation.v1.TokenResponse;
 import com.example.auth.domain.auth.exception.AuthErrorCode;
 import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.info.RegistrationCompletionInfo;
@@ -23,6 +28,7 @@ import com.example.auth.external.notification.MockNotificationSender;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -32,8 +38,10 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -42,8 +50,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * LOCAL 온보딩 E2E: 시작→이메일/휴대폰 코드→Mock 본인인증→필수동의 버퍼→완료 판정을 실 PostgreSQL·
- * Redis로 검증한다.
+ * LOCAL 온보딩 E2E: 시작→이메일/휴대폰 코드→Mock 본인인증→필수동의 버퍼→가입 완료 커밋→로그인→세션
+ * 검증을 실 PostgreSQL·Redis로 검증한다.
  *
  * <p>보안 불변식을 함께 검증한다 — 스텝 미충족 complete 거부, 챌린지 종별 교차 제출 거부(SMS 코드로
  * 이메일 스텝 위조 불가), 온보딩 세션의 PII 원문 미보유(참조만).
@@ -82,8 +90,11 @@ class OnboardingApiE2EIT {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     @Test
-    void completesFullLocalOnboardingAndReturnsCreateUserBundle() {
+    void completesFullLocalOnboardingThenSignupLoginAndSessionCheckSucceed() {
         String email = "onboard-happy@example.com";
         RegistrationStartResponse started = start(email);
 
@@ -122,6 +133,37 @@ class OnboardingApiE2EIT {
                     .doesNotContain(PHONE)
                     .doesNotContain(BIRTH.toString());
         }
+
+        // 영속 PENDING 미생성 — 완료 전까지 진행 상태는 Redis TTL 세션에만 있다.
+        long usersBefore = count("select count(*) from usr.users");
+        assertThat(count("select count(*) from auth.auth_account where login_email = ?", email))
+                .isZero();
+
+        ResponseEntity<RegistrationCompleteResponse> completed = rest.postForEntity(
+                "/auth/registration/complete",
+                new RegistrationCompleteRequest(started.registrationId(), started.onboardingToken(), "secret123"),
+                RegistrationCompleteResponse.class);
+        assertThat(completed.getStatusCode().value()).isEqualTo(201);
+        UUID userId = requireNonNull(completed.getBody()).userId();
+        assertThat(count("select count(*) from usr.users")).isEqualTo(usersBefore + 1);
+
+        // 가입 완료 → 로그인 → 세션 검증.
+        ResponseEntity<TokenResponse> loggedIn =
+                rest.postForEntity("/auth/login", new LoginRequest(email, "secret123"), TokenResponse.class);
+        assertThat(loggedIn.getStatusCode().value()).isEqualTo(200);
+        HttpHeaders bearer = new HttpHeaders();
+        bearer.setBearerAuth(requireNonNull(loggedIn.getBody()).accessToken());
+        ResponseEntity<MeResponse> me =
+                rest.exchange("/auth/me", HttpMethod.GET, new HttpEntity<>(bearer), MeResponse.class);
+        assertThat(me.getStatusCode().value()).isEqualTo(200);
+        assertThat(requireNonNull(me.getBody()).userId()).isEqualTo(userId);
+
+        // 성공한 완료는 세션(멱등키)을 소비한다 — 같은 registrationId 재요청은 404.
+        ResponseEntity<String> replayed = rest.postForEntity(
+                "/auth/registration/complete",
+                new RegistrationCompleteRequest(started.registrationId(), started.onboardingToken(), "secret123"),
+                String.class);
+        assertThat(replayed.getStatusCode().value()).isEqualTo(404);
     }
 
     @Test
@@ -134,6 +176,12 @@ class OnboardingApiE2EIT {
                 .isInstanceOf(AuthException.class)
                 .satisfies(e -> assertThat(((AuthException) e).getErrorCode())
                         .isEqualTo(AuthErrorCode.REGISTRATION_STEP_INCOMPLETE));
+
+        ResponseEntity<String> response = rest.postForEntity(
+                "/auth/registration/complete",
+                new RegistrationCompleteRequest(started.registrationId(), started.onboardingToken(), "secret123"),
+                String.class);
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
     }
 
     @Test
@@ -209,6 +257,11 @@ class OnboardingApiE2EIT {
                 String.class);
 
         assertThat(response.getStatusCode().value()).isEqualTo(400);
+    }
+
+    private long count(String sql, Object... args) {
+        Long value = jdbc.queryForObject(sql, Long.class, args);
+        return value == null ? 0 : value;
     }
 
     private RegistrationStartResponse start(String email) {
