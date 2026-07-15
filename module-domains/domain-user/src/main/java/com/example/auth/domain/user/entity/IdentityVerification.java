@@ -88,6 +88,19 @@ public class IdentityVerification extends BaseTimeEntity<UUID> {
     }
 
     /**
+     * 정회원 생성({@code CreateUser}) 시 회원을 연결한다(VERIFIED·미연결에서 1회만). 연결된
+     * {@code userId}는 이 인증 건이 가입 커밋에 소비되었다는 멱등 영수증이다.
+     *
+     * @throws UserException VERIFIED가 아니거나 이미 연결된 상태에서 호출 시(409)
+     */
+    public void attachUser(UUID userId) {
+        if (status != VerificationStatus.VERIFIED || this.userId != null) {
+            throw new UserException(UserErrorCode.VERIFICATION_STATE_INVALID);
+        }
+        this.userId = userId;
+    }
+
+    /**
      * 실명확인 실패로 종결한다(REQUESTED→FAILED).
      *
      * @throws UserException REQUESTED가 아닌 상태에서 호출 시(409)

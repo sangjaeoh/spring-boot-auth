@@ -11,7 +11,6 @@ import com.example.auth.app.api.presentation.v1.PasswordResetInitiateRequest;
 import com.example.auth.app.api.presentation.v1.PasswordResetInitiateResponse;
 import com.example.auth.app.api.presentation.v1.TokenResponse;
 import com.example.auth.external.notification.MockNotificationSender;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -62,7 +61,7 @@ class PasswordApiE2EIT {
     @Test
     void resetSetsNewPasswordAndRevokesExistingSessions() {
         String email = "reset@example.com";
-        provisioning.provision(UUID.randomUUID(), email, "secret123");
+        provisioning.provision(email, "secret123");
         TokenResponse tokens = login(email, "secret123");
 
         ResponseEntity<PasswordResetInitiateResponse> initiated = rest.postForEntity(
@@ -92,7 +91,7 @@ class PasswordApiE2EIT {
     @Test
     void resetRejectsWrongCode() {
         String email = "resetwrong@example.com";
-        provisioning.provision(UUID.randomUUID(), email, "secret123");
+        provisioning.provision(email, "secret123");
 
         ResponseEntity<PasswordResetInitiateResponse> initiated = rest.postForEntity(
                 "/auth/password/reset/initiate",
@@ -112,7 +111,7 @@ class PasswordApiE2EIT {
     @Test
     void resetRejectingReuseConsumesCode() {
         String email = "resetreuse@example.com";
-        provisioning.provision(UUID.randomUUID(), email, "secret123");
+        provisioning.provision(email, "secret123");
 
         ResponseEntity<PasswordResetInitiateResponse> initiated = rest.postForEntity(
                 "/auth/password/reset/initiate",
@@ -141,7 +140,7 @@ class PasswordApiE2EIT {
     @Test
     void changeSetsNewPassword() {
         String email = "change@example.com";
-        provisioning.provision(UUID.randomUUID(), email, "secret123");
+        provisioning.provision(email, "secret123");
         TokenResponse tokens = login(email, "secret123");
 
         ResponseEntity<Void> changed = rest.exchange(
@@ -158,7 +157,7 @@ class PasswordApiE2EIT {
     @Test
     void changeRejectsWrongCurrentPassword() {
         String email = "changewrong@example.com";
-        provisioning.provision(UUID.randomUUID(), email, "secret123");
+        provisioning.provision(email, "secret123");
         TokenResponse tokens = login(email, "secret123");
 
         ResponseEntity<String> changed = rest.exchange(
@@ -173,7 +172,7 @@ class PasswordApiE2EIT {
     @Test
     void changeRejectsReuseOfCurrentPassword() {
         String email = "reuse@example.com";
-        provisioning.provision(UUID.randomUUID(), email, "secret123");
+        provisioning.provision(email, "secret123");
         TokenResponse tokens = login(email, "secret123");
 
         ResponseEntity<String> changed = rest.exchange(

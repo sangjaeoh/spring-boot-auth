@@ -1,7 +1,10 @@
 package com.example.auth.app.api.facade;
 
 import com.example.auth.domain.auth.entity.ConsentSelection;
+import com.example.auth.domain.auth.info.RegistrationCompletionInfo;
 import com.example.auth.domain.auth.info.RegistrationStartedInfo;
+import com.example.auth.domain.auth.service.AccountRegistrationProcessor;
+import com.example.auth.domain.auth.service.PasswordPolicyValidator;
 import com.example.auth.domain.auth.service.RegistrationSessionProcessor;
 import com.example.auth.domain.user.entity.Carrier;
 import com.example.auth.domain.user.entity.Gender;
@@ -30,14 +33,20 @@ public class OnboardingFacade {
     private final RegistrationSessionProcessor registrationSessionProcessor;
     private final IdentityVerificationProcessor identityVerificationProcessor;
     private final ConsentValidator consentValidator;
+    private final AccountRegistrationProcessor accountRegistrationProcessor;
+    private final PasswordPolicyValidator passwordPolicyValidator;
 
     public OnboardingFacade(
             RegistrationSessionProcessor registrationSessionProcessor,
             IdentityVerificationProcessor identityVerificationProcessor,
-            ConsentValidator consentValidator) {
+            ConsentValidator consentValidator,
+            AccountRegistrationProcessor accountRegistrationProcessor,
+            PasswordPolicyValidator passwordPolicyValidator) {
         this.registrationSessionProcessor = registrationSessionProcessor;
         this.identityVerificationProcessor = identityVerificationProcessor;
         this.consentValidator = consentValidator;
+        this.accountRegistrationProcessor = accountRegistrationProcessor;
+        this.passwordPolicyValidator = passwordPolicyValidator;
     }
 
     /**
@@ -104,5 +113,21 @@ public class OnboardingFacade {
         List<ConsentSelection> selections = new ArrayList<>();
         agreed.forEach((type, version) -> selections.add(new ConsentSelection(type.name(), version)));
         registrationSessionProcessor.bufferRequiredConsents(registrationId, onboardingToken, selections);
+    }
+
+    /**
+     * 온보딩을 정회원으로 커밋한다 — 스텝셋 충족 번들에 비밀번호를 더해 유저·인증을 단일 트랜잭션으로
+     * 원자 생성하고, 성공 후 세션(멱등키)을 소비한다. 소비된 세션의 재요청은 404이며, 커밋과 소비 사이
+     * 장애로 세션이 남은 재요청은 멱등 재실행으로 같은 {@code UserId}를 돌려받는다.
+     *
+     * <p>비밀번호 정책은 트랜잭션 진입 전 선검증한다(회복 가능한 오류로 크로스스키마 쓰기·롤백을
+     * 만들지 않는다 — 최종 권위는 자격증명 등록의 재검증).
+     */
+    public UUID complete(UUID registrationId, String onboardingToken, String rawPassword) {
+        passwordPolicyValidator.validate(rawPassword);
+        RegistrationCompletionInfo completion = registrationSessionProcessor.complete(registrationId, onboardingToken);
+        UUID userId = accountRegistrationProcessor.register(completion, rawPassword);
+        registrationSessionProcessor.consume(registrationId);
+        return userId;
     }
 }

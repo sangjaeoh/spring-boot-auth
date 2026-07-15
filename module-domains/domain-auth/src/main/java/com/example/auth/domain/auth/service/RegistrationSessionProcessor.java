@@ -176,6 +176,14 @@ public class RegistrationSessionProcessor {
                 session.consents());
     }
 
+    /**
+     * 가입 커밋이 성공한 세션(멱등키)을 파기한다. 커밋 후 파기 실패(저장소 불가 503) 시 세션이 남지만,
+     * 재요청은 {@code CreateUser}의 멱등 재실행으로 수렴한다.
+     */
+    public void consume(UUID registrationId) {
+        store.delete(registrationId);
+    }
+
     private void verifyBoundChallenge(
             UUID registrationId, @Nullable String boundChallengeId, String presentedChallengeId, String code) {
         // 바인딩 대조는 챌린지 소비 전이다 — 불일치 제출이 유효 챌린지를 소진시키지 않는다.

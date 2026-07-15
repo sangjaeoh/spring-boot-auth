@@ -66,8 +66,7 @@ class AuthApiE2EIT {
 
     @Test
     void loginAuthenticatedRequestThenLogoutRevokesImmediately() {
-        UUID userId = UUID.randomUUID();
-        provisioning.provision(userId, "alice@example.com", "secret123");
+        UUID userId = provisioning.provision("alice@example.com", "secret123");
 
         TokenResponse tokens = login("alice@example.com", "secret123");
 
@@ -87,7 +86,7 @@ class AuthApiE2EIT {
 
     @Test
     void wrongPasswordIsRejected() {
-        provisioning.provision(UUID.randomUUID(), "bob@example.com", "secret123");
+        provisioning.provision("bob@example.com", "secret123");
 
         ResponseEntity<String> response =
                 rest.postForEntity("/auth/login", new LoginRequest("bob@example.com", "wrongpass1"), String.class);
@@ -104,7 +103,7 @@ class AuthApiE2EIT {
 
     @Test
     void refreshRotatesAndReuseRevokesFamily() {
-        provisioning.provision(UUID.randomUUID(), "carol@example.com", "secret123");
+        provisioning.provision("carol@example.com", "secret123");
         TokenResponse first = login("carol@example.com", "secret123");
 
         ResponseEntity<TokenResponse> rotated = rest.postForEntity(
@@ -129,8 +128,7 @@ class AuthApiE2EIT {
 
     @Test
     void jwksEndpointPublishesPublicKeysThatVerifyIssuedTokens() throws Exception {
-        UUID userId = UUID.randomUUID();
-        provisioning.provision(userId, "dave@example.com", "secret123");
+        UUID userId = provisioning.provision("dave@example.com", "secret123");
         TokenResponse tokens = login("dave@example.com", "secret123");
 
         // JWKS는 인증 없이 접근 가능(permitAll).

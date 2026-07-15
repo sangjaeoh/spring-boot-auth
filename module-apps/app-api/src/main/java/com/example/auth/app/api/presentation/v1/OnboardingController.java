@@ -100,4 +100,18 @@ public class OnboardingController {
         }
         onboardingFacade.bufferConsents(request.registrationId(), request.onboardingToken(), agreed);
     }
+
+    /**
+     * 가입을 완료한다 — 유저·인증 원자 생성(단일 트랜잭션) 후 세션을 소비한다.
+     *
+     * <p>사용 중인 로그인 이메일이면 409를 명시 응답한다 — 이 표면은 온보딩 토큰과 이메일 소유 검증을
+     * 통과한 요청자만 도달하므로, 미인증 열거 프로브를 막는 재설정 시작의 동형 응답과 달리 존재 노출이
+     * 아니다.
+     */
+    @PostMapping("/complete")
+    @ResponseStatus(HttpStatus.CREATED)
+    public RegistrationCompleteResponse complete(@Valid @RequestBody RegistrationCompleteRequest request) {
+        return new RegistrationCompleteResponse(
+                onboardingFacade.complete(request.registrationId(), request.onboardingToken(), request.password()));
+    }
 }

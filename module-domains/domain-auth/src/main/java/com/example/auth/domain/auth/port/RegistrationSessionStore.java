@@ -70,4 +70,9 @@ public interface RegistrationSessionStore {
      * @return 세션 부재(만료 포함)면 {@code false}
      */
     boolean markRequiredConsented(UUID registrationId, List<ConsentSelection> consents);
+
+    /**
+     * 세션을 파기한다(가입 커밋 성공 후 멱등키 소비). 이미 부재면 아무 일도 하지 않는다.
+     */
+    void delete(UUID registrationId);
 }

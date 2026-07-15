@@ -135,6 +135,16 @@ public class RedisRegistrationSessionStore implements RegistrationSessionStore {
         return mark(registrationId, FIELD_REQUIRED_CONSENTED, MARKED, FIELD_CONSENTS, serializeConsents(consents));
     }
 
+    @Override
+    public void delete(UUID registrationId) {
+        try {
+            redis.delete(registrationKey(registrationId));
+        } catch (DataAccessException e) {
+            log.warn("온보딩 세션 파기 중 Redis 예외 — fail-closed(503)", e);
+            throw new AuthException(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
+        }
+    }
+
     private boolean mark(UUID registrationId, String... fieldValuePairs) {
         try {
             Long result =
