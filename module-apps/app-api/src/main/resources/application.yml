@@ -22,3 +22,9 @@ auth:
     jwks:
       # 유예 창 ≥ 2×Access TTL(15분). 회전된 키를 이 기간 검증·게시한 뒤 축출한다.
       grace-minutes: 30
+  password:
+    hashing:
+      # 동시 Argon2 실행 상한(0=auto=가용 코어수). peak Argon2 힙 ≈ max-concurrent × argon2.memory-kb(≈코어×19MB).
+      # 상한 초과 요청은 acquire-timeout-ms까지 permit을 대기한 뒤 503으로 차단한다.
+      max-concurrent: 0
+      acquire-timeout-ms: 500
