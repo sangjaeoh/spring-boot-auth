@@ -21,6 +21,7 @@ import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.info.LoginAccountInfo;
 import com.example.auth.domain.auth.info.RecognizedDeviceInfo;
 import com.example.auth.domain.auth.info.RegistrationCompletionInfo;
+import com.example.auth.domain.auth.info.RiskAssessmentInfo;
 import com.example.auth.domain.auth.info.SessionCreated;
 import com.example.auth.domain.auth.info.SocialAuthenticationInfo;
 import com.example.auth.domain.auth.info.SocialRegistrationStartedInfo;
@@ -29,6 +30,7 @@ import com.example.auth.domain.auth.service.AuthAccountReader;
 import com.example.auth.domain.auth.service.DeviceRecognitionService;
 import com.example.auth.domain.auth.service.LoginAttemptAppender;
 import com.example.auth.domain.auth.service.RegistrationSessionProcessor;
+import com.example.auth.domain.auth.service.RiskEvaluator;
 import com.example.auth.domain.auth.service.SessionProcessor;
 import com.example.auth.domain.auth.service.SocialConnectionProcessor;
 import java.time.Duration;
@@ -58,6 +60,7 @@ public class SocialAuthFacade {
     private final AuthAccountReader authAccountReader;
     private final LoginAttemptAppender loginAttemptAppender;
     private final DeviceRecognitionService deviceRecognitionService;
+    private final RiskEvaluator riskEvaluator;
     private final SessionProcessor sessionProcessor;
     private final JwtIssuer jwtIssuer;
     private final MessagePublisher messagePublisher;
@@ -70,6 +73,7 @@ public class SocialAuthFacade {
             AuthAccountReader authAccountReader,
             LoginAttemptAppender loginAttemptAppender,
             DeviceRecognitionService deviceRecognitionService,
+            RiskEvaluator riskEvaluator,
             SessionProcessor sessionProcessor,
             JwtIssuer jwtIssuer,
             MessagePublisher messagePublisher,
@@ -80,6 +84,7 @@ public class SocialAuthFacade {
         this.authAccountReader = authAccountReader;
         this.loginAttemptAppender = loginAttemptAppender;
         this.deviceRecognitionService = deviceRecognitionService;
+        this.riskEvaluator = riskEvaluator;
         this.sessionProcessor = sessionProcessor;
         this.jwtIssuer = jwtIssuer;
         this.messagePublisher = messagePublisher;
@@ -161,15 +166,24 @@ public class SocialAuthFacade {
             UUID userId, DeviceBindingRequest device, String ip, @Nullable String userAgent, Instant now) {
         RecognizedDeviceInfo recognized = deviceRecognitionService.recognize(
                 userId, device.fingerprint(), device.deviceName(), device.platform(), ip, now);
+        RiskAssessmentInfo risk = riskEvaluator.evaluate(userId, recognized.newDevice(), ip, now);
         SessionCreated session = sessionProcessor.createSession(userId, recognized.deviceId(), ip, userAgent, now);
-        loginAttemptAppender.record(userId, LoginResult.SUCCESS, null, ip, recognized.deviceId(), 0, now);
+        loginAttemptAppender.record(
+                userId,
+                LoginResult.SUCCESS,
+                null,
+                ip,
+                recognized.deviceId(),
+                risk.riskScore(),
+                risk.countryCode(),
+                now);
         messagePublisher.publish(new LoggedIn(userId, session.sessionId(), now));
         String accessToken = jwtIssuer.issueAccess(userId, session.sessionId(), DEFAULT_ROLES, accessTtl, now);
         return new TokenResponse(accessToken, session.refreshToken(), accessTtl.toSeconds());
     }
 
     private void fail(UUID userId, FailureReason reason, String ip, Instant now) {
-        loginAttemptAppender.record(userId, LoginResult.FAILURE, reason, ip, null, 0, now);
+        loginAttemptAppender.record(userId, LoginResult.FAILURE, reason, ip, null, 0, null, now);
         messagePublisher.publish(new LoginFailed(userId, reason, now));
         throw new AuthException(AuthErrorCode.SOCIAL_TOKEN_INVALID);
     }

@@ -79,7 +79,7 @@ class AuthPersistenceIT {
     @Test
     void appendsLoginAttempt() {
         LoginAttempt attempt = LoginAttempt.create(
-                null, LoginResult.FAILURE, FailureReason.BAD_CREDENTIAL, "203.0.113.1", null, 0, Instant.now());
+                null, LoginResult.FAILURE, FailureReason.BAD_CREDENTIAL, "203.0.113.1", null, 0, null, Instant.now());
 
         loginAttemptRepository.save(attempt);
 

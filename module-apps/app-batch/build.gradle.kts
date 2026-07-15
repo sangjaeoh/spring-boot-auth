@@ -16,6 +16,7 @@ dependencies {
     implementation(project(":module-infra:infra-crypto"))
     implementation(project(":module-infra:infra-messaging"))
     implementation(project(":module-infra:infra-redis"))
+    implementation(project(":module-external:external-geoip"))
     implementation(project(":module-external:external-identity"))
     implementation(project(":module-external:external-notification"))
     implementation(project(":module-external:external-social"))

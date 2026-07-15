@@ -14,12 +14,14 @@ import com.example.auth.domain.auth.exception.AuthErrorCode;
 import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.info.LoginAccountInfo;
 import com.example.auth.domain.auth.info.RecognizedDeviceInfo;
+import com.example.auth.domain.auth.info.RiskAssessmentInfo;
 import com.example.auth.domain.auth.info.RotationOutcome;
 import com.example.auth.domain.auth.info.SessionCreated;
 import com.example.auth.domain.auth.service.AuthAccountReader;
 import com.example.auth.domain.auth.service.DeviceRecognitionService;
 import com.example.auth.domain.auth.service.LoginAttemptAppender;
 import com.example.auth.domain.auth.service.PasswordCredentialReader;
+import com.example.auth.domain.auth.service.RiskEvaluator;
 import com.example.auth.domain.auth.service.SessionProcessor;
 import java.time.Duration;
 import java.time.Instant;
@@ -45,6 +47,7 @@ public class AuthFacade {
     private final PasswordCredentialReader passwordCredentialReader;
     private final LoginAttemptAppender loginAttemptAppender;
     private final DeviceRecognitionService deviceRecognitionService;
+    private final RiskEvaluator riskEvaluator;
     private final SessionProcessor sessionProcessor;
     private final JwtIssuer jwtIssuer;
     private final MessagePublisher messagePublisher;
@@ -55,6 +58,7 @@ public class AuthFacade {
             PasswordCredentialReader passwordCredentialReader,
             LoginAttemptAppender loginAttemptAppender,
             DeviceRecognitionService deviceRecognitionService,
+            RiskEvaluator riskEvaluator,
             SessionProcessor sessionProcessor,
             JwtIssuer jwtIssuer,
             MessagePublisher messagePublisher,
@@ -63,6 +67,7 @@ public class AuthFacade {
         this.passwordCredentialReader = passwordCredentialReader;
         this.loginAttemptAppender = loginAttemptAppender;
         this.deviceRecognitionService = deviceRecognitionService;
+        this.riskEvaluator = riskEvaluator;
         this.sessionProcessor = sessionProcessor;
         this.jwtIssuer = jwtIssuer;
         this.messagePublisher = messagePublisher;
@@ -89,7 +94,7 @@ public class AuthFacade {
                 // 휴면 안내는 자격 검증 성공자에게만 노출한다(열거 저항 — 실 KDF 1회로 타이밍 동일).
                 if (passwordCredentialReader.verify(account.userId(), rawPassword)) {
                     loginAttemptAppender.record(
-                            account.userId(), LoginResult.FAILURE, FailureReason.NOT_ACTIVE, ip, null, 0, now);
+                            account.userId(), LoginResult.FAILURE, FailureReason.NOT_ACTIVE, ip, null, 0, null, now);
                     messagePublisher.publish(new LoginFailed(account.userId(), FailureReason.NOT_ACTIVE, now));
                     throw new AuthException(AuthErrorCode.ACCOUNT_DORMANT);
                 }
@@ -106,9 +111,18 @@ public class AuthFacade {
         // 기기 인식은 자격 검증 성공 후에만 수행한다 — 실패 시도가 기기 행을 만들지 않게 한다.
         RecognizedDeviceInfo recognized = deviceRecognitionService.recognize(
                 account.userId(), device.fingerprint(), device.deviceName(), device.platform(), ip, now);
+        RiskAssessmentInfo risk = riskEvaluator.evaluate(account.userId(), recognized.newDevice(), ip, now);
         SessionCreated session =
                 sessionProcessor.createSession(account.userId(), recognized.deviceId(), ip, userAgent, now);
-        loginAttemptAppender.record(account.userId(), LoginResult.SUCCESS, null, ip, recognized.deviceId(), 0, now);
+        loginAttemptAppender.record(
+                account.userId(),
+                LoginResult.SUCCESS,
+                null,
+                ip,
+                recognized.deviceId(),
+                risk.riskScore(),
+                risk.countryCode(),
+                now);
         messagePublisher.publish(new LoggedIn(account.userId(), session.sessionId(), now));
         String accessToken =
                 jwtIssuer.issueAccess(account.userId(), session.sessionId(), DEFAULT_ROLES, accessTtl, now);
@@ -143,7 +157,7 @@ public class AuthFacade {
     }
 
     private void fail(@Nullable UUID userId, FailureReason reason, String ip, Instant now) {
-        loginAttemptAppender.record(userId, LoginResult.FAILURE, reason, ip, null, 0, now);
+        loginAttemptAppender.record(userId, LoginResult.FAILURE, reason, ip, null, 0, null, now);
         messagePublisher.publish(new LoginFailed(userId, reason, now));
         throw new AuthException(AuthErrorCode.AUTHENTICATION_FAILED);
     }
