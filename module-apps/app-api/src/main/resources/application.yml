@@ -21,6 +21,17 @@ spring:
       # prod Cluster 노드 접속(spring.data.redis.cluster.nodes 등)은 배포 오버레이가 소유.
       timeout: 250ms
 
+# PII 봉투 암호화·blind index 키(dev 정적). prod는 시크릿 매니저 주입 + 분리 보관(pepper 유출 시 blind index
+# 역추론 가능). keys/peppers는 "version:base64[,version:base64]" — 회전 시 새 버전 추가 + active-version 상향
+# (구 암호문은 동봉 버전으로 복호되어 전 행 재암호화 불요).
+crypto:
+  envelope:
+    active-version: 1
+    keys: "1:vO5tqt9e8TOJ/R/qBbltt+FHyWJdL0khopfmCTfTxFo="
+  blind-index:
+    active-version: 1
+    peppers: "1:RqbTfuuNIU/NaYFmNMpGwU7jj0e+9YXIOytVeqnh4Ms="
+
 auth:
   jwt:
     jwks:

@@ -17,6 +17,7 @@ dependencies {
     testImplementation(project(":module-common:common-auth"))
     testImplementation(project(":module-common:common-web"))
     testImplementation(project(":module-domains:domain-auth"))
+    testImplementation(project(":module-domains:domain-user"))
     testImplementation(project(":module-infra:infra-crypto"))
     testImplementation(project(":module-infra:infra-redis"))
     testImplementation(project(":module-external:external-notification"))

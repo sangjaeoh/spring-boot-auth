@@ -3,9 +3,15 @@ plugins {
 }
 
 // Flyway 스키마별 독립 실행기(docs/architecture.md — 런타임 데이터 접근 없음, JDBC만).
-// Phase 0: 실행기 스캐폴드 + Flyway/DataSource 배선 검증. 도메인 스키마 마이그레이션 집약과
-// SchemaFlywayFactory(스키마별 인스턴스)는 두 번째 스키마가 등장하는 Phase 1에서 배선한다.
+// SchemaFlywayFactory(common-jpa)로 스키마마다 독립 history·독립 버전으로 마이그레이션한다.
+// 도메인 모듈은 자기 스키마 마이그레이션 리소스를 제공하려 runtimeOnly로 싣는다(엔티티는 미사용 — JPA
+// auto-config는 application.yml에서 exclude). Boot Flyway auto-config도 exclude(다중 스키마 버전 충돌 회피).
 dependencies {
+    implementation(project(":module-common:common-jpa"))
+
+    runtimeOnly(project(":module-domains:domain-auth"))
+    runtimeOnly(project(":module-domains:domain-user"))
+
     implementation(libs.spring.boot.starter.jdbc)
 
     runtimeOnly(libs.spring.boot.flyway)
