@@ -1,5 +1,6 @@
 package com.example.auth.domain.auth.service;
 
+import com.example.auth.domain.auth.entity.AuthAccount;
 import com.example.auth.domain.auth.entity.Email;
 import com.example.auth.domain.auth.exception.AuthErrorCode;
 import com.example.auth.domain.auth.exception.AuthException;
@@ -45,9 +46,11 @@ public class AuthAccountReader {
      */
     @Transactional(readOnly = true)
     public String getLoginEmail(UUID userId) {
+        // 탈퇴 계정은 loginEmail이 파기(null)돼 미존재와 동일하게 취급한다.
         return repository
                 .findById(userId)
-                .map(account -> account.getLoginEmail().value())
+                .map(AuthAccount::getLoginEmail)
+                .map(Email::value)
                 .orElseThrow(() -> new AuthException(AuthErrorCode.ACCOUNT_NOT_FOUND));
     }
 }

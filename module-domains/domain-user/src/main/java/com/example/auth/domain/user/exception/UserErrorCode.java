@@ -15,7 +15,10 @@ public enum UserErrorCode implements ErrorCode {
     REQUIRED_CONSENT_WITHDRAWAL("USER_REQUIRED_CONSENT_WITHDRAWAL", "필수 약관은 철회할 수 없습니다. 탈퇴 절차를 이용해주세요.", 400),
     CONSENT_NOT_FOUND("USER_CONSENT_NOT_FOUND", "철회할 동의가 존재하지 않습니다.", 404),
     SECURITY_CHANNEL_REQUIRED("USER_SECURITY_CHANNEL_REQUIRED", "보안 알림은 이메일·SMS 중 최소 한 채널을 유지해야 합니다.", 400),
-    USER_NOT_FOUND("USER_NOT_FOUND", "회원이 존재하지 않습니다.", 404);
+    USER_NOT_FOUND("USER_NOT_FOUND", "회원이 존재하지 않습니다.", 404),
+    USER_ALREADY_WITHDRAWN("USER_ALREADY_WITHDRAWN", "이미 탈퇴한 회원입니다.", 409),
+    INVALID_STATUS_TRANSITION("USER_INVALID_STATUS_TRANSITION", "회원 상태 전이가 올바르지 않습니다.", 409),
+    REJOIN_COOLDOWN("USER_REJOIN_COOLDOWN", "탈퇴 후 재가입 제한 기간입니다.", 409);
 
     private final String code;
     private final String message;

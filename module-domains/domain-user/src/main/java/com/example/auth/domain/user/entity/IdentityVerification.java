@@ -112,6 +112,27 @@ public class IdentityVerification extends BaseTimeEntity<UUID> {
         this.status = VerificationStatus.FAILED;
     }
 
+    /**
+     * 진행 만료로 종결한다(REQUESTED→EXPIRED). 기관 호출이 런타임 예외로 남긴 REQUESTED 잔존을 수렴하는
+     * 스윕 전용 전이다 — 기관에선 완료됐을 수 있으므로 FAILED로 오분류하지 않는다.
+     *
+     * @throws UserException REQUESTED가 아닌 상태에서 호출 시(409)
+     */
+    public void expire() {
+        if (status != VerificationStatus.REQUESTED) {
+            throw new UserException(UserErrorCode.VERIFICATION_STATE_INVALID);
+        }
+        this.status = VerificationStatus.EXPIRED;
+    }
+
+    /**
+     * 결과 PII를 파기한다(암호문 컬럼 null 소거 — crypto-shred 등가). 요청·상태 사실은 유지하고 결과
+     * 값만 소거한다(회원 탈퇴·보존창 경과 파기가 호출).
+     */
+    public void purgeResult() {
+        this.result = null;
+    }
+
     @Override
     public UUID getId() {
         return id;

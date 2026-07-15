@@ -42,6 +42,9 @@ app:
     schemas: auth,usr,msg
 
 user:
+  retention:
+    # 재가입 쿨다운(확정 30일) — CI tombstone의 withdrawnAt 기준. 나머지 보존·파기 창은 app-batch가 소유.
+    rejoin-cooldown-days: 30
   identity-verification:
     # 본인인증 진행 만료(expiresAt 계산). 경과분은 app-batch EXPIRED 스윕이 수렴한다.
     ttl-minutes: 10

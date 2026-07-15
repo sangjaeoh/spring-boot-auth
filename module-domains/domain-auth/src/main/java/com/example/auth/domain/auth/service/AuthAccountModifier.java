@@ -3,12 +3,15 @@ package com.example.auth.domain.auth.service;
 import com.example.auth.common.messaging.MessagePublisher;
 import com.example.auth.domain.auth.entity.AuthAccount;
 import com.example.auth.domain.auth.entity.Email;
+import com.example.auth.domain.auth.entity.LifecycleStatus;
 import com.example.auth.domain.auth.event.LoginEmailChanged;
 import com.example.auth.domain.auth.exception.AuthErrorCode;
 import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.repository.AuthAccountRepository;
 import java.time.Instant;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class AuthAccountModifier {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthAccountModifier.class);
 
     private final AuthAccountRepository repository;
     private final MessagePublisher messagePublisher;
@@ -44,5 +49,19 @@ public class AuthAccountModifier {
         }
         account.changeLoginEmail(email);
         messagePublisher.publish(new LoginEmailChanged(userId, Instant.now()));
+    }
+
+    /**
+     * 유저 생명주기 스냅샷을 반영한다 — 단조 버전 기준 멱등이며 역순·중복 이벤트는 무시된다.
+     * 계정 미존재도 무시한다(at-least-once 재전달이 계정 삭제 뒤 도착하는 경우의 안전 흡수).
+     */
+    @Transactional
+    public void applyUserStatus(UUID userId, LifecycleStatus status, long version) {
+        AuthAccount account = repository.findById(userId).orElse(null);
+        if (account == null) {
+            log.warn("유저 상태 스냅샷 반영 대상 계정 없음 userId={} status={} version={}", userId, status, version);
+            return;
+        }
+        account.applyUserStatus(status, version);
     }
 }

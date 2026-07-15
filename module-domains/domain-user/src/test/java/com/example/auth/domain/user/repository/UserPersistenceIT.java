@@ -1,5 +1,6 @@
 package com.example.auth.domain.user.repository;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.auth.common.core.crypto.BlindIndexer;
@@ -88,12 +89,14 @@ class UserPersistenceIT {
         List<User> found = userRepository.findByContactPhoneBidx(blindIndexer.blindIndex(PHONE));
         assertThat(found).extracting(User::getId).containsExactly(userId);
 
-        // 3) 복호 왕복(로드 시 PII 원문 복원).
+        // 3) 복호 왕복(로드 시 PII 원문 복원). PII는 미탈퇴 회원에서 항상 존재한다.
         User loaded = userRepository.findById(userId).orElseThrow();
-        assertThat(loaded.getProfile().name()).isEqualTo(NAME);
-        assertThat(loaded.getProfile().birthDate()).isEqualTo(BIRTH);
-        assertThat(loaded.getContact().contactPhone().number()).isEqualTo(PHONE);
-        assertThat(loaded.getContact().contactEmail().value()).isEqualTo(EMAIL);
+        Profile loadedProfile = requireNonNull(loaded.getProfile());
+        Contact loadedContact = requireNonNull(loaded.getContact());
+        assertThat(loadedProfile.name()).isEqualTo(NAME);
+        assertThat(loadedProfile.birthDate()).isEqualTo(BIRTH);
+        assertThat(loadedContact.contactPhone().number()).isEqualTo(PHONE);
+        assertThat(loadedContact.contactEmail().value()).isEqualTo(EMAIL);
     }
 
     /**

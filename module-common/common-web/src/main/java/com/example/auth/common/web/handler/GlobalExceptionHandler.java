@@ -16,7 +16,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     /**
-     * 도메인 예외를 상태·코드·메시지를 담은 ProblemDetail로 변환한다.
+     * 도메인 예외를 상태·코드·메시지를 담은 ProblemDetail로 변환한다. 예외가 추가 컨텍스트를 노출하면
+     * ({@code properties()}) 각 항목을 속성으로 싣는다.
      */
     @ExceptionHandler(BaseException.class)
     public ProblemDetail handleBaseException(BaseException exception) {
@@ -24,6 +25,7 @@ public class GlobalExceptionHandler {
         ProblemDetail problemDetail =
                 ProblemDetail.forStatusAndDetail(HttpStatusCode.valueOf(errorCode.status()), errorCode.message());
         problemDetail.setProperty("code", errorCode.code());
+        exception.properties().forEach(problemDetail::setProperty);
         return problemDetail;
     }
 }
