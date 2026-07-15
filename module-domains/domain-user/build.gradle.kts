@@ -8,4 +8,5 @@ plugins {
 dependencies {
     implementation(project(":module-common:common-core"))
     implementation(project(":module-common:common-jpa"))
+    implementation(project(":module-common:common-messaging"))
 }

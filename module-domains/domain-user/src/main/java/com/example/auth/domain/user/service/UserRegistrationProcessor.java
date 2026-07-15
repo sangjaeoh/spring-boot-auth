@@ -4,7 +4,6 @@ import static java.util.Objects.requireNonNull;
 
 import com.example.auth.domain.user.entity.CiRegistry;
 import com.example.auth.domain.user.entity.ConsentAction;
-import com.example.auth.domain.user.entity.ConsentRecord;
 import com.example.auth.domain.user.entity.Contact;
 import com.example.auth.domain.user.entity.Email;
 import com.example.auth.domain.user.entity.IdentityVerification;
@@ -14,11 +13,8 @@ import com.example.auth.domain.user.entity.TermsType;
 import com.example.auth.domain.user.entity.VerificationResult;
 import com.example.auth.domain.user.exception.UserException;
 import com.example.auth.domain.user.repository.CiRegistryRepository;
-import com.example.auth.domain.user.repository.ConsentRecordRepository;
 import com.example.auth.domain.user.repository.IdentityVerificationRepository;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -26,8 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 온보딩 완료의 {@code CreateUser} 명령을 수행한다 — 한 트랜잭션에서 {@code User(ACTIVE)} 생성 →
- * {@code ConsentRecord} append → {@code CiRegistry.link}(유니크 hard-enforce) → {@code IdentityVerification}
- * 연결을 원자 수행하고 {@code UserId}를 반환한다.
+ * {@code ConsentRecord} append(+{@code ConsentState} fold) → 알림 수신 설정 초기화 →
+ * {@code CiRegistry.link}(유니크 hard-enforce) → {@code IdentityVerification} 연결을 원자 수행하고
+ * {@code UserId}를 반환한다.
  *
  * <p>"한 트랜잭션 하나의 애그리거트" 원칙의 문서화된 예외다(docs/architecture.md 트랜잭션 경계 —
  * 온보딩 가입 완료). 멱등하다: {@code verificationRef}가 이미 회원에 연결돼 있으면(직전 커밋의 영수증)
@@ -42,7 +39,8 @@ public class UserRegistrationProcessor {
     private final ConsentValidator consentValidator;
     private final CiUniquenessValidator ciUniquenessValidator;
     private final UserAppender userAppender;
-    private final ConsentRecordRepository consentRecordRepository;
+    private final ConsentAppender consentAppender;
+    private final NotificationPreferenceAppender notificationPreferenceAppender;
     private final CiRegistryRepository ciRegistryRepository;
 
     public UserRegistrationProcessor(
@@ -50,13 +48,15 @@ public class UserRegistrationProcessor {
             ConsentValidator consentValidator,
             CiUniquenessValidator ciUniquenessValidator,
             UserAppender userAppender,
-            ConsentRecordRepository consentRecordRepository,
+            ConsentAppender consentAppender,
+            NotificationPreferenceAppender notificationPreferenceAppender,
             CiRegistryRepository ciRegistryRepository) {
         this.identityVerificationRepository = identityVerificationRepository;
         this.consentValidator = consentValidator;
         this.ciUniquenessValidator = ciUniquenessValidator;
         this.userAppender = userAppender;
-        this.consentRecordRepository = consentRecordRepository;
+        this.consentAppender = consentAppender;
+        this.notificationPreferenceAppender = notificationPreferenceAppender;
         this.ciRegistryRepository = ciRegistryRepository;
     }
 
@@ -84,10 +84,9 @@ public class UserRegistrationProcessor {
         UUID userId = userAppender.register(profile, contact, ciHash);
 
         Instant now = Instant.now();
-        List<ConsentRecord> records = new ArrayList<>();
         consents.forEach(
-                (type, version) -> records.add(ConsentRecord.create(userId, type, version, ConsentAction.AGREE, now)));
-        consentRecordRepository.saveAll(records);
+                (type, version) -> consentAppender.append(userId, type, version, ConsentAction.AGREE, null, now));
+        notificationPreferenceAppender.initialize(userId, consents.containsKey(TermsType.MARKETING));
         ciRegistryRepository.save(CiRegistry.link(ciHash, userId, now));
         verification.attachUser(userId);
         return userId;

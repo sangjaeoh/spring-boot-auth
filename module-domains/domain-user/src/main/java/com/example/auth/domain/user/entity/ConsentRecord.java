@@ -10,13 +10,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * 동의 이력 애그리거트 루트다 — append-only 불변 로그(update/delete 없음, 법적 입증 근거).
  *
  * <p>가입 최초 동의는 온보딩 버퍼에 있다가 {@code CreateUser} 트랜잭션에서 {@code userId}와 함께
- * append된다(userId 없는 선-기록 금지). 현재 동의 스냅샷({@code ConsentState} fold 읽기모델)·철회·마케팅
- * 채널은 동의 정식화(P4)에서 추가한다.
+ * append된다(userId 없는 선-기록 금지). 현재 동의 스냅샷은 {@code ConsentState} fold 읽기모델이 소유한다.
  */
 @Entity
 @Table(schema = "usr", name = "consent_record")
@@ -40,27 +40,45 @@ public class ConsentRecord extends BaseTimeEntity<UUID> {
     @Column(name = "action", length = 10)
     private ConsentAction action;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "channel", length = 10)
+    @Nullable
+    private NotificationChannel channel;
+
     @Column(name = "at")
     private Instant at;
 
     protected ConsentRecord() {}
 
     private ConsentRecord(
-            UUID id, UUID userId, TermsType termsType, int termsVersion, ConsentAction action, Instant at) {
+            UUID id,
+            UUID userId,
+            TermsType termsType,
+            int termsVersion,
+            ConsentAction action,
+            @Nullable NotificationChannel channel,
+            Instant at) {
         this.id = id;
         this.userId = userId;
         this.termsType = termsType;
         this.termsVersion = termsVersion;
         this.action = action;
+        this.channel = channel;
         this.at = at;
     }
 
     /**
-     * 동의/철회 이력 한 건을 생성한다(생성 후 불변 — 정정도 새 append로만 표현한다).
+     * 동의/철회 이력 한 건을 생성한다(생성 후 불변 — 정정도 새 append로만 표현한다). 채널은 마케팅 동의의
+     * 채널 한정 선택에만 쓴다(그 외 null).
      */
     public static ConsentRecord create(
-            UUID userId, TermsType termsType, int termsVersion, ConsentAction action, Instant at) {
-        return new ConsentRecord(UuidV7Generator.generate(), userId, termsType, termsVersion, action, at);
+            UUID userId,
+            TermsType termsType,
+            int termsVersion,
+            ConsentAction action,
+            @Nullable NotificationChannel channel,
+            Instant at) {
+        return new ConsentRecord(UuidV7Generator.generate(), userId, termsType, termsVersion, action, channel, at);
     }
 
     @Override
@@ -82,6 +100,10 @@ public class ConsentRecord extends BaseTimeEntity<UUID> {
 
     public ConsentAction getAction() {
         return action;
+    }
+
+    public @Nullable NotificationChannel getChannel() {
+        return channel;
     }
 
     public Instant getAt() {
