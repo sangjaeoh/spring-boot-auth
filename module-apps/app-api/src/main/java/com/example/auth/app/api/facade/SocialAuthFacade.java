@@ -29,6 +29,7 @@ import com.example.auth.domain.auth.service.AccountRegistrationProcessor;
 import com.example.auth.domain.auth.service.AuthAccountReader;
 import com.example.auth.domain.auth.service.DeviceRecognitionService;
 import com.example.auth.domain.auth.service.LoginAttemptAppender;
+import com.example.auth.domain.auth.service.RateLimitPolicyValidator;
 import com.example.auth.domain.auth.service.RegistrationSessionProcessor;
 import com.example.auth.domain.auth.service.RiskEvaluator;
 import com.example.auth.domain.auth.service.SessionProcessor;
@@ -58,6 +59,7 @@ public class SocialAuthFacade {
     private final RegistrationSessionProcessor registrationSessionProcessor;
     private final AccountRegistrationProcessor accountRegistrationProcessor;
     private final AuthAccountReader authAccountReader;
+    private final RateLimitPolicyValidator rateLimitPolicyValidator;
     private final LoginAttemptAppender loginAttemptAppender;
     private final DeviceRecognitionService deviceRecognitionService;
     private final RiskEvaluator riskEvaluator;
@@ -71,6 +73,7 @@ public class SocialAuthFacade {
             RegistrationSessionProcessor registrationSessionProcessor,
             AccountRegistrationProcessor accountRegistrationProcessor,
             AuthAccountReader authAccountReader,
+            RateLimitPolicyValidator rateLimitPolicyValidator,
             LoginAttemptAppender loginAttemptAppender,
             DeviceRecognitionService deviceRecognitionService,
             RiskEvaluator riskEvaluator,
@@ -82,6 +85,7 @@ public class SocialAuthFacade {
         this.registrationSessionProcessor = registrationSessionProcessor;
         this.accountRegistrationProcessor = accountRegistrationProcessor;
         this.authAccountReader = authAccountReader;
+        this.rateLimitPolicyValidator = rateLimitPolicyValidator;
         this.loginAttemptAppender = loginAttemptAppender;
         this.deviceRecognitionService = deviceRecognitionService;
         this.riskEvaluator = riskEvaluator;
@@ -105,6 +109,8 @@ public class SocialAuthFacade {
             String ip,
             @Nullable String userAgent) {
         Instant now = Instant.now();
+        // 소셜 로그인은 검증 전 계정 식별자가 없어 IP 기준만 제한한다.
+        rateLimitPolicyValidator.checkLogin(ip, null);
         SocialAuthenticationInfo identity = socialConnectionProcessor.authenticate(provider, idToken);
         UUID connectedUserId = identity.connectedUserId();
         if (connectedUserId == null) {

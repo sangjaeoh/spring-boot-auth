@@ -15,6 +15,8 @@ import org.springframework.context.annotation.Import;
     RedisChallengeConfig.class,
     RedisVerificationChallengeStore.class,
     RedisRegistrationConfig.class,
-    RedisRegistrationSessionStore.class
+    RedisRegistrationSessionStore.class,
+    RedisRateLimitConfig.class,
+    RedisRateLimitStore.class
 })
 class RedisTestApplication {}

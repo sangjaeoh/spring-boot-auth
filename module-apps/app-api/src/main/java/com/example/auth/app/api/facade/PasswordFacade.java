@@ -13,6 +13,7 @@ import com.example.auth.domain.auth.port.VerificationResult;
 import com.example.auth.domain.auth.service.AuthAccountReader;
 import com.example.auth.domain.auth.service.PasswordCredentialModifier;
 import com.example.auth.domain.auth.service.PasswordPolicyValidator;
+import com.example.auth.domain.auth.service.RateLimitPolicyValidator;
 import com.example.auth.domain.auth.service.SessionProcessor;
 import com.example.auth.domain.auth.service.VerificationChallengeProcessor;
 import java.time.Instant;
@@ -39,6 +40,7 @@ public class PasswordFacade {
     private final VerificationChallengeProcessor challengeProcessor;
     private final PasswordCredentialModifier passwordCredentialModifier;
     private final PasswordPolicyValidator policyValidator;
+    private final RateLimitPolicyValidator rateLimitPolicyValidator;
     private final SessionProcessor sessionProcessor;
     private final MessagePublisher messagePublisher;
 
@@ -47,20 +49,26 @@ public class PasswordFacade {
             VerificationChallengeProcessor challengeProcessor,
             PasswordCredentialModifier passwordCredentialModifier,
             PasswordPolicyValidator policyValidator,
+            RateLimitPolicyValidator rateLimitPolicyValidator,
             SessionProcessor sessionProcessor,
             MessagePublisher messagePublisher) {
         this.authAccountReader = authAccountReader;
         this.challengeProcessor = challengeProcessor;
         this.passwordCredentialModifier = passwordCredentialModifier;
         this.policyValidator = policyValidator;
+        this.rateLimitPolicyValidator = rateLimitPolicyValidator;
         this.sessionProcessor = sessionProcessor;
         this.messagePublisher = messagePublisher;
     }
 
     /**
-     * 재설정을 시작해 인증코드를 발송하고 {@code challengeId}를 반환한다(미존재 계정도 동형 응답).
+     * 재설정을 시작해 인증코드를 발송하고 {@code challengeId}를 반환한다(미존재 계정도 동형 응답 —
+     * 레이트리밋도 계정 존재와 무관하게 균일 적용한다).
+     *
+     * @throws AuthException 레이트리밋 초과 시(429)
      */
-    public String initiateReset(String email) {
+    public String initiateReset(String email, String ip) {
+        rateLimitPolicyValidator.checkPasswordResetInitiate(ip, email);
         Optional<LoginAccountInfo> account = authAccountReader.findForLogin(email);
         if (account.isEmpty()) {
             return UuidV7Generator.generate().toString();

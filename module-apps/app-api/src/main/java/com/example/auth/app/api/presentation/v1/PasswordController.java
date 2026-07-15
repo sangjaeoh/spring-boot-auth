@@ -2,6 +2,7 @@ package com.example.auth.app.api.presentation.v1;
 
 import com.example.auth.app.api.facade.PasswordFacade;
 import com.example.auth.common.web.security.AuthUser;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,8 +28,10 @@ public class PasswordController {
      * 비밀번호 재설정을 시작하고 인증코드를 발송한다.
      */
     @PostMapping("/reset/initiate")
-    public PasswordResetInitiateResponse initiateReset(@Valid @RequestBody PasswordResetInitiateRequest request) {
-        return new PasswordResetInitiateResponse(passwordFacade.initiateReset(request.email()));
+    public PasswordResetInitiateResponse initiateReset(
+            @Valid @RequestBody PasswordResetInitiateRequest request, HttpServletRequest httpRequest) {
+        return new PasswordResetInitiateResponse(
+                passwordFacade.initiateReset(request.email(), httpRequest.getRemoteAddr()));
     }
 
     /**

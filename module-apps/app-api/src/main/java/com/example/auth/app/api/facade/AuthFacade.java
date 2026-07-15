@@ -21,6 +21,7 @@ import com.example.auth.domain.auth.service.AuthAccountReader;
 import com.example.auth.domain.auth.service.DeviceRecognitionService;
 import com.example.auth.domain.auth.service.LoginAttemptAppender;
 import com.example.auth.domain.auth.service.PasswordCredentialReader;
+import com.example.auth.domain.auth.service.RateLimitPolicyValidator;
 import com.example.auth.domain.auth.service.RiskEvaluator;
 import com.example.auth.domain.auth.service.SessionProcessor;
 import java.time.Duration;
@@ -44,6 +45,7 @@ public class AuthFacade {
     private static final List<String> DEFAULT_ROLES = List.of("USER");
 
     private final AuthAccountReader authAccountReader;
+    private final RateLimitPolicyValidator rateLimitPolicyValidator;
     private final PasswordCredentialReader passwordCredentialReader;
     private final LoginAttemptAppender loginAttemptAppender;
     private final DeviceRecognitionService deviceRecognitionService;
@@ -55,6 +57,7 @@ public class AuthFacade {
 
     public AuthFacade(
             AuthAccountReader authAccountReader,
+            RateLimitPolicyValidator rateLimitPolicyValidator,
             PasswordCredentialReader passwordCredentialReader,
             LoginAttemptAppender loginAttemptAppender,
             DeviceRecognitionService deviceRecognitionService,
@@ -64,6 +67,7 @@ public class AuthFacade {
             MessagePublisher messagePublisher,
             @Value("${auth.access.ttl-minutes:15}") int accessTtlMinutes) {
         this.authAccountReader = authAccountReader;
+        this.rateLimitPolicyValidator = rateLimitPolicyValidator;
         this.passwordCredentialReader = passwordCredentialReader;
         this.loginAttemptAppender = loginAttemptAppender;
         this.deviceRecognitionService = deviceRecognitionService;
@@ -83,6 +87,7 @@ public class AuthFacade {
     public TokenResponse login(
             String email, String rawPassword, DeviceBindingRequest device, String ip, @Nullable String userAgent) {
         Instant now = Instant.now();
+        rateLimitPolicyValidator.checkLogin(ip, email);
         Optional<LoginAccountInfo> found = authAccountReader.findForLogin(email);
         if (found.isEmpty()) {
             passwordCredentialReader.verifyAbsent(rawPassword);
