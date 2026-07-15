@@ -86,6 +86,30 @@ public class LoginAttempt extends BaseTimeEntity<UUID> {
         return new LoginAttempt(UuidV7Generator.generate(), userId, result, failureReason, ip, deviceId, riskScore, at);
     }
 
+    /**
+     * IP를 가명화한다(뒤 절단 — IPv4는 앞 2옥텟, IPv6은 첫 그룹만 유지). append 사실·순서는 불변이고 PII
+     * 값만 소거하는 보존 규칙의 유일한 수정 경로이며, 재적용해도 결과가 같다(멱등).
+     */
+    public void anonymizeIp() {
+        this.ip = truncate(this.ip);
+    }
+
+    /**
+     * IP가 이미 가명화되었는지 반환한다(가명화 스윕의 재처리 스킵 기준).
+     */
+    public boolean isIpAnonymized() {
+        return ip.equals(truncate(ip));
+    }
+
+    private static String truncate(String ip) {
+        if (ip.contains(".")) {
+            String[] octets = ip.split("\\.", -1);
+            return octets.length == 4 ? octets[0] + "." + octets[1] + ".*.*" : "*";
+        }
+        int firstGroupEnd = ip.indexOf(':');
+        return firstGroupEnd > 0 ? ip.substring(0, firstGroupEnd) + ":*" : "*";
+    }
+
     @Override
     public UUID getId() {
         return id;

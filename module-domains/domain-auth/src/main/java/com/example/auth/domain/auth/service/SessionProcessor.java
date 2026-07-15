@@ -6,6 +6,7 @@ import com.example.auth.common.core.crypto.TokenHasher;
 import com.example.auth.common.core.id.UuidV7Generator;
 import com.example.auth.common.messaging.MessagePublisher;
 import com.example.auth.domain.auth.event.ConcurrentLimitExceeded;
+import com.example.auth.domain.auth.event.LastLoginObserved;
 import com.example.auth.domain.auth.event.RefreshReuseDetected;
 import com.example.auth.domain.auth.event.SessionRevoked;
 import com.example.auth.domain.auth.info.RotationOutcome;
@@ -80,6 +81,8 @@ public class SessionProcessor {
         if (!evicted.isEmpty()) {
             messagePublisher.publish(new ConcurrentLimitExceeded(userId, evicted, now));
         }
+        // 세션 발급 = 접속 관측. 유저의 휴면 판정(lastLoginAt)이 이 이벤트로만 갱신된다.
+        messagePublisher.publish(new LastLoginObserved(userId, now));
         return new SessionCreated(sessionId, userId, refreshPlain);
     }
 

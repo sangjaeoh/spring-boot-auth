@@ -35,4 +35,18 @@ public class UserReader {
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
         return MyUserInfo.from(user);
     }
+
+    /**
+     * 연락용 이메일 원문을 반환한다(알림·OTP 수신자 진실원본 — 표시 마스킹은 호출측 정책).
+     *
+     * @throws UserException 미존재·탈퇴(PII 파기) 회원이면(404)
+     */
+    @Transactional(readOnly = true)
+    public String getContactEmail(UUID userId) {
+        return repository
+                .findById(userId)
+                .map(User::getContact)
+                .map(contact -> contact.contactEmail().value())
+                .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+    }
 }

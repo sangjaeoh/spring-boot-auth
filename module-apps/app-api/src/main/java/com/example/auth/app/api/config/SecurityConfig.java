@@ -42,7 +42,8 @@ public class SecurityConfig {
                                 "/auth/password/reset/complete",
                                 "/auth/registration/**",
                                 "/auth/social/login",
-                                "/auth/social/registration/complete")
+                                "/auth/social/registration/complete",
+                                "/auth/dormant-release/**")
                         .permitAll()
                         .anyRequest()
                         .authenticated())

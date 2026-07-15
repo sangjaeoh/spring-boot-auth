@@ -10,15 +10,19 @@ import org.jspecify.annotations.Nullable;
  * 로그인 접근 판정에 필요한 인증 계정 스냅샷이다(경계 조회 모델).
  *
  * <p>{@code loginAllowed}가 false면 {@code blockReason}에 사유가 담긴다(이력 기록용 — 클라이언트 응답은
- * 사유를 구분하지 않는다).
+ * 사유를 구분하지 않되, 휴면({@code dormant})만 자격 검증 성공자에게 해제 안내를 노출한다).
  */
 public record LoginAccountInfo(
-        UUID userId, boolean loginAllowed, @Nullable FailureReason blockReason) {
+        UUID userId, boolean loginAllowed, @Nullable FailureReason blockReason, boolean dormant) {
 
     public static LoginAccountInfo from(AuthAccount account) {
         FailureReason blockReason = account.isLoginAllowed()
                 ? null
                 : (account.getUserStatus() != LifecycleStatus.ACTIVE ? FailureReason.NOT_ACTIVE : FailureReason.LOCKED);
-        return new LoginAccountInfo(account.getUserId(), account.isLoginAllowed(), blockReason);
+        return new LoginAccountInfo(
+                account.getUserId(),
+                account.isLoginAllowed(),
+                blockReason,
+                account.getUserStatus() == LifecycleStatus.DORMANT);
     }
 }

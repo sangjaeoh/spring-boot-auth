@@ -30,5 +30,7 @@ include(":module-external:external-identity")
 include(":module-external:external-notification")
 include(":module-external:external-social")
 include(":module-apps:app-api")
+
+include(":module-apps:app-batch")
 include(":module-apps:app-migration")
 include(":architecture-tests")

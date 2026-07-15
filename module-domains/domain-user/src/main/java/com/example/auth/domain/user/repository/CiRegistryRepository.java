@@ -1,7 +1,10 @@
 package com.example.auth.domain.user.repository;
 
 import com.example.auth.domain.user.entity.CiRegistry;
+import com.example.auth.domain.user.entity.CiStatus;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,4 +22,6 @@ public interface CiRegistryRepository extends JpaRepository<CiRegistry, UUID> {
     Optional<CiRegistry> findWithLockByCiHash(String ciHash);
 
     Optional<CiRegistry> findByLinkedUserId(UUID linkedUserId);
+
+    List<CiRegistry> findByStatusAndWithdrawnAtBefore(CiStatus status, Instant cutoff);
 }

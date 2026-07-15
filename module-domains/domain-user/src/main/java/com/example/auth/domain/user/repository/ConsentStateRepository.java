@@ -12,4 +12,6 @@ public interface ConsentStateRepository extends JpaRepository<ConsentState, UUID
     List<ConsentState> findByUserId(UUID userId);
 
     Optional<ConsentState> findByUserIdAndTermsType(UUID userId, TermsType termsType);
+
+    long deleteByUserId(UUID userId);
 }

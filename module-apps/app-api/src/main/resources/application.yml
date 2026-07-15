@@ -43,8 +43,14 @@ app:
 
 user:
   retention:
-    # 재가입 쿨다운(확정 30일) — CI tombstone의 withdrawnAt 기준. 나머지 보존·파기 창은 app-batch가 소유.
+    # 보존·파기 정책값(정본: DOMAIN_MODEL 보존·파기 스케줄 — 설정 외부화, 하드코딩 금지).
+    # 파기 집행은 app-batch 잡이 소유하고, 쿨다운 판정은 가입 경로(CiUniquenessValidator)가 쓴다.
     rejoin-cooldown-days: 30
+    dormancy-months: 12
+    dormancy-notice-days: 30
+    verification-pii-purge-days: 5
+    ci-tombstone-months: 6
+    consent-retention-years: 5
   identity-verification:
     # 본인인증 진행 만료(expiresAt 계산). 경과분은 app-batch EXPIRED 스윕이 수렴한다.
     ttl-minutes: 10
@@ -54,6 +60,10 @@ user:
     mode: mock
 
 auth:
+  retention:
+    # 로그인이력 보존 2년 + IP 90일 후 가명화(안전성 확보조치 기준 §8① — 집행은 app-batch).
+    login-attempt-years: 2
+    login-ip-anonymize-days: 90
   session:
     # 동시 활성 세션 상한(정책 확정 3). 초과 생성은 최오래(issuedAt) 세션을 Lua 원자 축출한다.
     max-concurrent: 3
