@@ -7,7 +7,7 @@
 ## 작업 목록 (추천 순서)
 
 - [x] **0. (병렬·비코딩) 외부 조달 워크스트림 트래킹** — 본인인증기관 계약·소셜 4사 앱 심사·Apple Developer·법무(PIPA/PIA) 조달 현황 문서화. 수 주~수개월 리드타임으로 P2/P4의 크리티컬 패스 — 코딩과 병렬로 지금 개시
-- [ ] **1. Phase 1b — 온보딩 플로우 슬라이스** — RegistrationSession(Redis TTL) + 스텝 마킹 + Mock 본인인증(`external-identity`) + 필수동의 버퍼(Terms/Consent 시드) + 온보딩 전용 토큰
+- [x] **1. Phase 1b — 온보딩 플로우 슬라이스** — RegistrationSession(Redis TTL) + 스텝 마킹 + Mock 본인인증(`external-identity`) + 필수동의 버퍼(Terms/Consent 시드) + 온보딩 전용 토큰
 - [ ] **2. Phase 1b — CreateUser 단일 크로스스키마 트랜잭션 슬라이스** — usr+auth 한 ACID 트랜잭션으로 정회원 생성(고아-User 불가·CI 중복 거부). **이 항목 완료 = 요구사항 Phase 1(코어 로컬 인증 MVP) 완성**
 - [ ] **3. Phase 2 — 소셜 로그인 4종 + 연동/해제** — 카카오/네이버/구글/애플 OIDC(`external-social`) + 소셜 온보딩 + ≥1 로그인 수단 유지 + 애플 특수사항
 - [ ] **4. 이벤트 인프라 — common-messaging·infra-messaging** — MessagePublisher 포트 + 멱등 소비 + 내구 재시도(DLQ). P3의 `ForceLogoutRequested` 소비 등 크로스 도메인 리스너의 전제
