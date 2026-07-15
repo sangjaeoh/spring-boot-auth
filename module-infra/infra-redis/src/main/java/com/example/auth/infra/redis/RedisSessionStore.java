@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -34,7 +35,8 @@ public class RedisSessionStore implements SessionStore {
     private final StringRedisTemplate redis;
     private final RedisScript<String> rotateScript;
 
-    public RedisSessionStore(StringRedisTemplate redis, RedisScript<String> rotateSessionScript) {
+    public RedisSessionStore(
+            StringRedisTemplate redis, @Qualifier("rotateSessionScript") RedisScript<String> rotateSessionScript) {
         this.redis = redis;
         this.rotateScript = rotateSessionScript;
     }

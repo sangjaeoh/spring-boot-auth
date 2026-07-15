@@ -30,7 +30,11 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/auth/login", "/auth/token/refresh")
+                .authorizeHttpRequests(auth -> auth.requestMatchers(
+                                "/auth/login",
+                                "/auth/token/refresh",
+                                "/auth/password/reset/initiate",
+                                "/auth/password/reset/complete")
                         .permitAll()
                         .anyRequest()
                         .authenticated())

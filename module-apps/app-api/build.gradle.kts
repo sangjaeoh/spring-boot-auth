@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":module-domains:domain-auth"))
     implementation(project(":module-infra:infra-crypto"))
     implementation(project(":module-infra:infra-redis"))
+    implementation(project(":module-external:external-notification"))
     implementation(project(":module-common:common-auth"))
     implementation(project(":module-common:common-web"))
 

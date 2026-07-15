@@ -9,5 +9,10 @@ import org.springframework.context.annotation.Import;
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration
-@Import({RedisSessionConfig.class, RedisSessionStore.class})
+@Import({
+    RedisSessionConfig.class,
+    RedisSessionStore.class,
+    RedisChallengeConfig.class,
+    RedisVerificationChallengeStore.class
+})
 class RedisTestApplication {}

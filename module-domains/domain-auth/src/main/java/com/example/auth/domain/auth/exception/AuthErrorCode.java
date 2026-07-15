@@ -12,6 +12,10 @@ public enum AuthErrorCode implements ErrorCode {
     LOGIN_EMAIL_DUPLICATE("AUTH_LOGIN_EMAIL_DUPLICATE", "이미 사용 중인 이메일입니다.", 409),
     AUTHENTICATION_FAILED("AUTH_AUTHENTICATION_FAILED", "이메일 또는 비밀번호가 올바르지 않습니다.", 401),
     PASSWORD_POLICY_VIOLATION("AUTH_PASSWORD_POLICY", "비밀번호가 정책을 충족하지 않습니다.", 400),
+    PASSWORD_REUSED("AUTH_PASSWORD_REUSED", "최근 사용한 비밀번호는 다시 사용할 수 없습니다.", 400),
+    CURRENT_PASSWORD_MISMATCH("AUTH_CURRENT_PASSWORD_MISMATCH", "현재 비밀번호가 올바르지 않습니다.", 400),
+    PASSWORD_CREDENTIAL_NOT_FOUND("AUTH_PASSWORD_CREDENTIAL_NOT_FOUND", "비밀번호 자격증명이 없습니다.", 404),
+    VERIFICATION_CODE_INVALID("AUTH_VERIFICATION_CODE_INVALID", "인증 코드가 올바르지 않거나 만료되었습니다.", 400),
     REFRESH_TOKEN_INVALID("AUTH_REFRESH_INVALID", "유효하지 않은 리프레시 토큰입니다.", 401),
     REFRESH_TOKEN_REUSE("AUTH_REFRESH_REUSE", "보안을 위해 세션이 종료되었습니다. 다시 로그인해 주세요.", 401);
 

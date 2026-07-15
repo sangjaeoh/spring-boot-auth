@@ -15,6 +15,10 @@ dependencies {
     add("implementation", platform(libs.findLibrary("spring-boot-dependencies").get()))
     add("implementation", libs.findLibrary("spring-boot-starter-data-jpa").get())
 
+    // JPA mappedBy 역참조 필드(프레임워크가 리플렉션으로만 읽는 자식 @ManyToOne)의 @Keep 마킹용.
+    // (docs/entity-persistence.md — 미사용 필드 정적분석은 마커로 표기)
+    add("compileOnly", libs.findLibrary("errorprone-annotations").get())
+
     // 도메인은 자기 스키마 마이그레이션을 소유한다. Flyway·드라이버는 테스트(및 app-migration)에서 실행된다.
     // spring-boot-flyway = Spring Boot 4의 Flyway auto-config 모듈(flyway-core만으론 마이그레이션 미실행).
     add("runtimeOnly", libs.findLibrary("postgresql").get())
