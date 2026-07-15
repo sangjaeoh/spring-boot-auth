@@ -16,6 +16,8 @@ public enum AuthErrorCode implements ErrorCode {
     CURRENT_PASSWORD_MISMATCH("AUTH_CURRENT_PASSWORD_MISMATCH", "현재 비밀번호가 올바르지 않습니다.", 400),
     PASSWORD_CREDENTIAL_NOT_FOUND("AUTH_PASSWORD_CREDENTIAL_NOT_FOUND", "비밀번호 자격증명이 없습니다.", 404),
     VERIFICATION_CODE_INVALID("AUTH_VERIFICATION_CODE_INVALID", "인증 코드가 올바르지 않거나 만료되었습니다.", 400),
+    REGISTRATION_NOT_FOUND("AUTH_REGISTRATION_NOT_FOUND", "가입 세션이 존재하지 않거나 만료되었습니다.", 404),
+    REGISTRATION_STEP_INCOMPLETE("AUTH_REGISTRATION_STEP_INCOMPLETE", "가입에 필요한 인증 절차가 완료되지 않았습니다.", 409),
     REFRESH_TOKEN_INVALID("AUTH_REFRESH_INVALID", "유효하지 않은 리프레시 토큰입니다.", 401),
     REFRESH_TOKEN_REUSE("AUTH_REFRESH_REUSE", "보안을 위해 세션이 종료되었습니다. 다시 로그인해 주세요.", 401),
     SESSION_STORE_UNAVAILABLE("AUTH_SESSION_STORE_UNAVAILABLE", "일시적으로 세션 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.", 503);
