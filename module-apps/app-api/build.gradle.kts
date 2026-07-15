@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":module-common:common-jpa"))
     implementation(project(":module-common:common-messaging"))
     implementation(project(":module-domains:domain-auth"))
+    implementation(project(":module-domains:domain-generic"))
     implementation(project(":module-domains:domain-user"))
     implementation(project(":module-infra:infra-crypto"))
     implementation(project(":module-infra:infra-messaging"))
