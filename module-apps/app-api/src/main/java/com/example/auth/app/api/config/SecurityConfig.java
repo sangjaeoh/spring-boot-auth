@@ -2,6 +2,7 @@ package com.example.auth.app.api.config;
 
 import com.example.auth.common.web.security.JwtAuthenticationFilter;
 import com.example.auth.common.web.security.ProblemDetailAuthenticationEntryPoint;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -30,12 +31,16 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.requestMatchers(
+                // 프레임워크 sendError(역직렬화 400 등)의 ERROR 디스패치가 /error에서 401로 둔갑하지 않게 허용.
+                .authorizeHttpRequests(auth -> auth.dispatcherTypeMatchers(DispatcherType.ERROR)
+                        .permitAll()
+                        .requestMatchers(
                                 "/.well-known/jwks.json",
                                 "/auth/login",
                                 "/auth/token/refresh",
                                 "/auth/password/reset/initiate",
-                                "/auth/password/reset/complete")
+                                "/auth/password/reset/complete",
+                                "/auth/registration/**")
                         .permitAll()
                         .anyRequest()
                         .authenticated())

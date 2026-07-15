@@ -13,6 +13,8 @@ import org.springframework.context.annotation.Import;
     RedisSessionConfig.class,
     RedisSessionStore.class,
     RedisChallengeConfig.class,
-    RedisVerificationChallengeStore.class
+    RedisVerificationChallengeStore.class,
+    RedisRegistrationConfig.class,
+    RedisRegistrationSessionStore.class
 })
 class RedisTestApplication {}
