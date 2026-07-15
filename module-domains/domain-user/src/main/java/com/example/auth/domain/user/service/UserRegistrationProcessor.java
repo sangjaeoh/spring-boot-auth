@@ -87,7 +87,14 @@ public class UserRegistrationProcessor {
         consents.forEach(
                 (type, version) -> consentAppender.append(userId, type, version, ConsentAction.AGREE, null, now));
         notificationPreferenceAppender.initialize(userId, consents.containsKey(TermsType.MARKETING));
-        ciRegistryRepository.save(CiRegistry.link(ciHash, userId, now));
+        // 재가입: 쿨다운이 지난 tombstone은 행 잠금 후 재연결한다(경합의 후발 트랜잭션은 relink 가드가
+        // DUPLICATE_CI로 거부). 신규 CI는 insert — 이중생성은 유니크 인덱스가 backstop.
+        CiRegistry tombstone = ciRegistryRepository.findWithLockByCiHash(ciHash).orElse(null);
+        if (tombstone == null) {
+            ciRegistryRepository.save(CiRegistry.link(ciHash, userId, now));
+        } else {
+            tombstone.relink(userId);
+        }
         verification.attachUser(userId);
         return userId;
     }

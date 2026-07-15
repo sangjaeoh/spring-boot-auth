@@ -1,5 +1,7 @@
 package com.example.auth.common.core.exception;
 
+import java.util.Map;
+
 /**
  * 경계에 도달하는 도메인 예외의 최상위 타입이다.
  *
@@ -21,5 +23,13 @@ public abstract class BaseException extends RuntimeException {
      */
     public ErrorCode getErrorCode() {
         return errorCode;
+    }
+
+    /**
+     * 응답에 실을 추가 컨텍스트(예: 재가입 잔여일)를 반환한다. 기본은 비어 있고, 컨텍스트가 필요한
+     * 예외만 재정의한다 — ProblemDetail 핸들러가 각 항목을 속성으로 노출한다.
+     */
+    public Map<String, Object> properties() {
+        return Map.of();
     }
 }

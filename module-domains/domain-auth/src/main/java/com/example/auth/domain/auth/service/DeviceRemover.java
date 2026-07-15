@@ -39,4 +39,13 @@ public class DeviceRemover {
         deviceRepository.delete(device);
         messagePublisher.publish(new DeviceDeleted(userId, deviceId, Instant.now()));
     }
+
+    /**
+     * 회원의 모든 기기를 파기한다(탈퇴 정리 — 없으면 무시·멱등). 세션은 탈퇴 정리가 전멸시키므로
+     * 기기별 {@link DeviceDeleted}는 발행하지 않는다.
+     */
+    @Transactional
+    public void purgeAll(UUID userId) {
+        deviceRepository.deleteByUserId(userId);
+    }
 }

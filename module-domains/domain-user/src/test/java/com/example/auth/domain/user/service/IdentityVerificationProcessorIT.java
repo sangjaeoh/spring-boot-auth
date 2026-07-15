@@ -191,7 +191,7 @@ class IdentityVerificationProcessorIT {
 
         @Bean
         CiUniquenessValidator ciUniquenessValidator(CiRegistryRepository repository) {
-            return new CiUniquenessValidator(repository);
+            return new CiUniquenessValidator(repository, 30);
         }
 
         @Bean

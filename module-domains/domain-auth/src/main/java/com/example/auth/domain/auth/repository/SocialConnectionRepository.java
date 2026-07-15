@@ -23,4 +23,6 @@ public interface SocialConnectionRepository extends JpaRepository<SocialConnecti
     boolean existsByUserIdAndProvider(UUID userId, SocialProvider provider);
 
     long countByUserId(UUID userId);
+
+    void deleteByUserId(UUID userId);
 }

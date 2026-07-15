@@ -19,4 +19,6 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
     Optional<Device> findByIdAndUserId(UUID id, UUID userId);
 
     List<Device> findAllByUserIdOrderByLastAccessedAtDesc(UUID userId);
+
+    void deleteByUserId(UUID userId);
 }
