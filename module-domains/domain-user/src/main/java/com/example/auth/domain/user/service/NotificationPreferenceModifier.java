@@ -1,24 +1,56 @@
 package com.example.auth.domain.user.service;
 
+import com.example.auth.common.messaging.MessagePublisher;
+import com.example.auth.domain.user.entity.NotificationCategory;
 import com.example.auth.domain.user.entity.NotificationChannel;
 import com.example.auth.domain.user.entity.NotificationPreference;
+import com.example.auth.domain.user.event.NotificationPreferenceChanged;
+import com.example.auth.domain.user.exception.UserErrorCode;
+import com.example.auth.domain.user.exception.UserException;
 import com.example.auth.domain.user.repository.NotificationPreferenceRepository;
+import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 알림 수신 설정의 마케팅 매트릭스를 동의 이력과 동기화한다({@code ConsentGiven/Withdrawn(MARKETING)}
- * 소비 경로). 회원별 허용/거부 API는 수신설정 슬라이스가 추가한다.
+ * 알림 수신 설정의 변경을 담당한다 — 회원별 채널×카테고리 허용/거부와 마케팅 동의 동기화.
  */
 @Service
 public class NotificationPreferenceModifier {
 
     private final NotificationPreferenceRepository repository;
+    private final MessagePublisher messagePublisher;
 
-    public NotificationPreferenceModifier(NotificationPreferenceRepository repository) {
+    public NotificationPreferenceModifier(
+            NotificationPreferenceRepository repository, MessagePublisher messagePublisher) {
         this.repository = repository;
+        this.messagePublisher = messagePublisher;
+    }
+
+    /**
+     * 해당 채널×카테고리 수신을 허용한다.
+     *
+     * @throws UserException 설정이 존재하지 않으면(404)
+     */
+    @Transactional
+    public void allow(UUID userId, NotificationChannel channel, NotificationCategory category) {
+        NotificationPreference preference = getPreference(userId);
+        preference.allow(channel, category);
+        messagePublisher.publish(new NotificationPreferenceChanged(userId, channel, category, true, Instant.now()));
+    }
+
+    /**
+     * 해당 채널×카테고리 수신을 거부한다.
+     *
+     * @throws UserException 설정이 존재하지 않으면(404); SECURITY의 마지막 연락 채널 해제 시도면(400)
+     */
+    @Transactional
+    public void disallow(UUID userId, NotificationChannel channel, NotificationCategory category) {
+        NotificationPreference preference = getPreference(userId);
+        preference.disallow(channel, category);
+        messagePublisher.publish(new NotificationPreferenceChanged(userId, channel, category, false, Instant.now()));
     }
 
     /**
@@ -32,5 +64,11 @@ public class NotificationPreferenceModifier {
             return;
         }
         preference.syncMarketingFromConsent(agreed, channel);
+    }
+
+    private NotificationPreference getPreference(UUID userId) {
+        return repository
+                .findById(userId)
+                .orElseThrow(() -> new UserException(UserErrorCode.NOTIFICATION_PREFERENCE_NOT_FOUND));
     }
 }

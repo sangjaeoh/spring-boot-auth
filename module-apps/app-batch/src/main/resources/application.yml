@@ -33,7 +33,7 @@ crypto:
 app:
   migration:
     # 배치가 접근하는 스키마(기동 검증용 — 운영 배포에서는 app-migration이 선행 실행된다).
-    schemas: auth,usr,msg
+    schemas: auth,usr,msg,generic
   batch:
     # 실행할 잡 CSV(빈 값이면 아무것도 실행하지 않는다): dormancy-notice, dormancy-transition, retention-purge
     jobs: ""

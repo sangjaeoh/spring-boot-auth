@@ -5,7 +5,9 @@ import com.example.auth.domain.user.entity.User;
 import com.example.auth.domain.user.exception.UserErrorCode;
 import com.example.auth.domain.user.exception.UserException;
 import com.example.auth.domain.user.info.MyUserInfo;
+import com.example.auth.domain.user.info.NotificationRecipientInfo;
 import com.example.auth.domain.user.repository.UserRepository;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,5 +50,14 @@ public class UserReader {
                 .map(User::getContact)
                 .map(contact -> contact.contactEmail().value())
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+    }
+
+    /**
+     * 알림 수신자 연락처(이메일·전화 원문)를 반환한다 — 발송 판정 경로용. 미존재·탈퇴(PII 파기)
+     * 회원은 빈 값으로 반환해 호출측이 발송을 스킵한다.
+     */
+    @Transactional(readOnly = true)
+    public Optional<NotificationRecipientInfo> findNotificationRecipient(UUID userId) {
+        return repository.findById(userId).map(User::getContact).map(NotificationRecipientInfo::from);
     }
 }

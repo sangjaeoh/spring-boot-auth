@@ -39,7 +39,13 @@ app:
   migration:
     # 이 앱이 영속하는 스키마(SchemaMigrationConfig가 스키마별 Flyway 실행). 스키마 추가 시 등록.
     # msg는 infra-messaging 소유(디둡·DLQ) — 도메인 스키마가 아닌 메시징 기술 스키마다.
-    schemas: auth,usr,msg
+    schemas: auth,usr,msg,generic
+
+generic:
+  notification:
+    # 카테고리 알림 발송 어댑터: mock(오프라인 dev/test) | vendor(실 발송). 조달(벤더 계약·키 발급) 완료 시
+    # vendor로 전환하고 generic.notification.{email|sms|push}.* 키를 주입한다(미주입 기동은 fail-fast).
+    mode: mock
 
 user:
   retention:

@@ -13,8 +13,16 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * {@code app.batch.jobs}(CSV)로 지정한다.
  */
 @SpringBootApplication(scanBasePackages = "com.example.auth")
-@EntityScan({"com.example.auth.domain.auth.entity", "com.example.auth.domain.user.entity"})
-@EnableJpaRepositories({"com.example.auth.domain.auth.repository", "com.example.auth.domain.user.repository"})
+@EntityScan({
+    "com.example.auth.domain.auth.entity",
+    "com.example.auth.domain.generic.entity",
+    "com.example.auth.domain.user.entity"
+})
+@EnableJpaRepositories({
+    "com.example.auth.domain.auth.repository",
+    "com.example.auth.domain.generic.repository",
+    "com.example.auth.domain.user.repository"
+})
 public class BatchApplication {
 
     public static void main(String[] args) {

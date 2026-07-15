@@ -20,5 +20,7 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
 
     List<Device> findAllByUserIdOrderByLastAccessedAtDesc(UUID userId);
 
+    List<Device> findAllByUserIdAndPushEnabledTrueAndPushTokenIsNotNullOrderByLastAccessedAtDesc(UUID userId);
+
     void deleteByUserId(UUID userId);
 }
