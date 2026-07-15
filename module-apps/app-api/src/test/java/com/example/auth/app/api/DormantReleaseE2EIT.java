@@ -51,6 +51,8 @@ class DormantReleaseE2EIT {
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("spring.data.redis.host", redis::getHost);
         registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
+        // 휴면 해제 플로우 검증에 집중한다 — 재발급 쿨다운은 ResendCooldownE2EIT가 검증한다.
+        registry.add("auth.verification.resend-cooldown-seconds", () -> 0);
     }
 
     @Autowired

@@ -25,6 +25,7 @@ public class VerificationChallengeProcessor {
     private final VerificationChallengeStore store;
     private final TokenHasher tokenHasher;
     private final VerificationCodeSender verificationCodeSender;
+    private final RateLimitPolicyValidator rateLimitPolicyValidator;
     private final SecureRandom random = new SecureRandom();
     private final Duration codeTtl;
     private final int maxAttempts;
@@ -34,21 +35,27 @@ public class VerificationChallengeProcessor {
             VerificationChallengeStore store,
             TokenHasher tokenHasher,
             VerificationCodeSender verificationCodeSender,
+            RateLimitPolicyValidator rateLimitPolicyValidator,
             @Value("${auth.verification.code-ttl-minutes:5}") long codeTtlMinutes,
             @Value("${auth.verification.max-attempts:5}") int maxAttempts,
             @Value("${auth.verification.code-digits:6}") int codeDigits) {
         this.store = store;
         this.tokenHasher = tokenHasher;
         this.verificationCodeSender = verificationCodeSender;
+        this.rateLimitPolicyValidator = rateLimitPolicyValidator;
         this.codeTtl = Duration.ofMinutes(codeTtlMinutes);
         this.maxAttempts = maxAttempts;
         this.codeDigits = codeDigits;
     }
 
     /**
-     * 새 인증코드를 발급해 저장하고 대상에게 발송한 뒤 챌린지ID를 반환한다.
+     * 새 인증코드를 발급해 저장하고 대상에게 발송한 뒤 챌린지ID를 반환한다. 모든 코드 발급이 이
+     * 진입점을 지나므로 재발송 쿨다운·채널별 일일 한도를 여기서 강제한다.
+     *
+     * @throws com.example.auth.domain.auth.exception.AuthException 쿨다운·일일 한도 초과 시(429)
      */
     public String issue(UUID subjectId, NotificationChannel channel, String target) {
+        rateLimitPolicyValidator.checkCodeIssue(channel, target);
         String challengeId = UuidV7Generator.generate().toString();
         String code = generateCode();
         store.issue(challengeId, subjectId, tokenHasher.hash(code), codeTtl, maxAttempts);
