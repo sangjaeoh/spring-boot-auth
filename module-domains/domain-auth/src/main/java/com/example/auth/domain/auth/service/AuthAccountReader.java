@@ -4,6 +4,7 @@ import com.example.auth.domain.auth.entity.Email;
 import com.example.auth.domain.auth.info.LoginAccountInfo;
 import com.example.auth.domain.auth.repository.AuthAccountRepository;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,5 +26,13 @@ public class AuthAccountReader {
     @Transactional(readOnly = true)
     public Optional<LoginAccountInfo> findForLogin(String loginEmail) {
         return repository.findByLoginEmail(Email.of(loginEmail)).map(LoginAccountInfo::from);
+    }
+
+    /**
+     * 계정 식별자로 접근 판정 스냅샷을 조회한다(소셜 로그인 — 기존 연동의 {@code userId} 경로).
+     */
+    @Transactional(readOnly = true)
+    public Optional<LoginAccountInfo> findForLogin(UUID userId) {
+        return repository.findById(userId).map(LoginAccountInfo::from);
     }
 }

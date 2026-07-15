@@ -55,7 +55,8 @@ public class AccountProvisioningFacade {
                 loginEmail,
                 verified.verificationId(),
                 verified.ciHash(),
-                SEED_CONSENTS);
+                SEED_CONSENTS,
+                null);
         return accountRegistrationProcessor.register(completion, rawPassword);
     }
 

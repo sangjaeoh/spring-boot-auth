@@ -7,13 +7,16 @@ import com.example.auth.common.core.id.UuidV7Generator;
 import com.example.auth.domain.auth.entity.ConsentSelection;
 import com.example.auth.domain.auth.entity.Email;
 import com.example.auth.domain.auth.entity.RegistrationType;
+import com.example.auth.domain.auth.entity.SocialProvider;
 import com.example.auth.domain.auth.exception.AuthErrorCode;
 import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.info.RegistrationCompletionInfo;
 import com.example.auth.domain.auth.info.RegistrationStartedInfo;
+import com.example.auth.domain.auth.info.SocialRegistrationStartedInfo;
 import com.example.auth.domain.auth.port.NotificationChannel;
 import com.example.auth.domain.auth.port.RegistrationSessionStore;
 import com.example.auth.domain.auth.port.RegistrationSnapshot;
+import com.example.auth.domain.auth.port.SocialRegistrationContext;
 import com.example.auth.domain.auth.port.VerificationResult;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -27,7 +30,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * LOCAL 가입 온보딩의 진행 상태를 조율한다(Redis 저장은 포트에 위임 — RDB 트랜잭션 없음).
+ * 가입 온보딩(LOCAL·SOCIAL)의 진행 상태를 조율한다(Redis 저장은 포트에 위임 — RDB 트랜잭션 없음).
  *
  * <p>영속 PENDING 계정을 만들지 않는다 — 진행 상태는 TTL 세션에만 있고, 온보딩 전용 토큰(불투명
  * 256bit 랜덤, 해시만 저장)이 이 표면의 유일한 인증이다. 세션 부재·토큰 불일치는 단일 404로 응답하고
@@ -74,6 +77,27 @@ public class RegistrationSessionProcessor {
         String emailChallengeId = challengeProcessor.issue(registrationId, NotificationChannel.EMAIL, email);
         requireAlive(store.attachEmailChallenge(registrationId, emailChallengeId));
         return new RegistrationStartedInfo(registrationId, onboardingToken, emailChallengeId, sessionTtl.toSeconds());
+    }
+
+    /**
+     * SOCIAL 온보딩을 시작한다 — 검증된 소셜 신원 컨텍스트를 보관한 세션 생성 + 온보딩 토큰 발급.
+     * 이메일 챌린지는 없다(이메일 소유는 IdP가 검증). PII 원문은 세션에 들이지 않는다 — subject와
+     * 릴레이 플래그만 보관한다.
+     *
+     * <p>반환된 {@code onboardingToken} 평문은 이 응답에서만 노출된다(로깅 금지).
+     */
+    public SocialRegistrationStartedInfo startSocial(
+            SocialProvider provider, String providerUserId, String email, boolean privateRelayEmail) {
+        String loginEmail = Email.of(email).value();
+        UUID registrationId = UuidV7Generator.generate();
+        String onboardingToken = generateToken();
+        store.createSocial(
+                registrationId,
+                tokenHasher.hash(onboardingToken),
+                loginEmail,
+                new SocialRegistrationContext(provider, providerUserId, privateRelayEmail),
+                sessionTtl);
+        return new SocialRegistrationStartedInfo(registrationId, onboardingToken, sessionTtl.toSeconds());
     }
 
     /**
@@ -173,7 +197,8 @@ public class RegistrationSessionProcessor {
                 session.loginEmail(),
                 requireNonNull(session.verificationRef()),
                 requireNonNull(session.ciHash()),
-                session.consents());
+                session.consents(),
+                session.social());
     }
 
     /**

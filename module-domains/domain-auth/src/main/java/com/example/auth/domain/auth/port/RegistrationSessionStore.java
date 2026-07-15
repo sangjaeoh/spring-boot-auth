@@ -25,6 +25,12 @@ public interface RegistrationSessionStore {
     void create(UUID registrationId, RegistrationType type, String tokenHash, String loginEmail, Duration ttl);
 
     /**
+     * SOCIAL 온보딩 세션을 검증된 소셜 신원 컨텍스트와 함께 저장하고 TTL을 원자적으로 건다.
+     */
+    void createSocial(
+            UUID registrationId, String tokenHash, String loginEmail, SocialRegistrationContext social, Duration ttl);
+
+    /**
      * 세션 스냅샷을 반환한다. 부재·만료면 empty.
      */
     Optional<RegistrationSnapshot> find(UUID registrationId);

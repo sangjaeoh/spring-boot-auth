@@ -191,7 +191,8 @@ class RegistrationCompletionIT {
                 loginEmail,
                 verified.verificationId(),
                 verified.ciHash(),
-                CONSENTS);
+                CONSENTS,
+                null);
     }
 
     private long count(String sql, Object... args) {

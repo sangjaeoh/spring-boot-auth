@@ -49,6 +49,10 @@ auth:
   registration:
     # 온보딩 세션 TTL(모델 확정 범위 30~60분). 만료 시 Redis가 자동 파기한다(영속 PENDING 금지).
     ttl-minutes: 30
+  social:
+    # 소셜 id_token 검증 어댑터: mock(오프라인 dev/test) | oidc(실 4사). 조달 완료 시 oidc로 전환하고
+    # auth.social.oidc.{kakao|naver|google|apple}.client-id를 주입한다(발급자·JWKS URI는 게시 기본값).
+    mode: mock
   jwt:
     jwks:
       # 유예 창 ≥ 2×Access TTL(15분). 회전된 키를 이 기간 검증·게시한 뒤 축출한다.

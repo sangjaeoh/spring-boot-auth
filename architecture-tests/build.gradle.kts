@@ -21,6 +21,7 @@ dependencies {
     testImplementation(project(":module-infra:infra-crypto"))
     testImplementation(project(":module-infra:infra-redis"))
     testImplementation(project(":module-external:external-notification"))
+    testImplementation(project(":module-external:external-social"))
     testImplementation(project(":module-apps:app-api"))
     testImplementation(project(":module-apps:app-migration"))
 }
