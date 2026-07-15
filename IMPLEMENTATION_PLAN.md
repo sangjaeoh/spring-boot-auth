@@ -233,7 +233,8 @@ P0(하네스, 타임박스 + 조달 병렬) → P1a(핫패스 MVP) → P1b(최�
 
 - [x] **Phase 0** — 빌드 하네스 + walking skeleton (`./gradlew build` green)
 - [x] **Phase 1a (핵심 슬라이스)** — 인증 핫패스 E2E: 로그인 → O(1) 세션검증 → 로그아웃 즉시 401 → 리프레시 회전 + 유예 창 + 재사용 감지→패밀리 전멸. 신규 모듈 `domain-auth`·`infra-redis`(Lua 회전)·`infra-crypto`(Argon2id/SHA-256)·`common-auth`(Nimbus RS256 JWT)·`common-web`(Spring Security 필터)·`app-api`. throwaway `domain-skeleton` 제거. 28 테스트 green(Testcontainers PG+Redis + HTTP E2E + ArchUnit).
-  - **1a 내 남은 슬라이스(다음 착수)**: 비번 재설정(`initiateReset`/`completeReset` + `VerificationChallenge`) + 최근 N 재사용 금지(`password_history`) + 로그인 상태 비번변경 + Argon2 바운드 실행기·용량모델 + JWKS 엔드포인트/90일 회전 + Redis HA/failover 정합.
+  - [x] **1a 비밀번호 생명주기 슬라이스** — 재설정(`initiateReset`/`completeReset` + `VerificationChallenge` Redis 애그리거트 + Lua 원자검증 + `NotificationSender` Mock 포트) + 최근 N 재사용 금지(`password_history`를 `PasswordCredential` 애그리거트 자식으로, cascade·orphanRemoval) + 로그인 상태 변경. 신규 모듈 `external-notification`(+`convention.external-module` 플러그인). 40 테스트 green. 설계→콜드 설계리뷰(YELLOW)→구현→콜드 코드리뷰(YELLOW, 블로킹 0)→반영.
+  - **1a 내 남은 슬라이스(다음 착수, 횡단 게이트)**: Argon2 바운드 실행기·용량모델 + JWKS 엔드포인트/90일 회전 + Redis HA/failover 정합.
 - [ ] **Phase 1b** — 최소 로컬 온보딩(`RegistrationSession`·`VerificationChallenge`·최소 `Terms`/`Consent` 시드·Mock 본인인증·`CiRegistry`·`User`), `CreateUser` 단일 크로스스키마 트랜잭션. `usr` 스키마 등장 → `SchemaFlywayFactory`·PII envelope 암호화·전화 blind index 이 단계에서 배선.
 - [ ] **Phase 2** — 소셜 로그인 4종 + 연동/해제
 - [ ] **Phase 3** — 디바이스 + 다중 로그인 제한(동시 세션 ≤N·최오래 축출) + 강제/원격 로그아웃

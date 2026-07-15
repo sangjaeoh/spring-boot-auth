@@ -105,6 +105,13 @@ public class SessionProcessor {
         eventPublisher.publishEvent(new SessionRevoked(userId, sessionId));
     }
 
+    /**
+     * 사용자의 전체 세션을 무효화한다(비밀번호 재설정 등 자격증명 변동 시 기존 세션 전멸).
+     */
+    public void revokeAll(UUID userId) {
+        sessionStore.revokeAll(userId);
+    }
+
     private String newOpaqueToken() {
         byte[] bytes = new byte[REFRESH_TOKEN_BYTES];
         random.nextBytes(bytes);

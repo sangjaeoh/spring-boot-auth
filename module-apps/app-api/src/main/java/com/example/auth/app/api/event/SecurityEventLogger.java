@@ -2,6 +2,9 @@ package com.example.auth.app.api.event;
 
 import com.example.auth.domain.auth.event.LoggedIn;
 import com.example.auth.domain.auth.event.LoginFailed;
+import com.example.auth.domain.auth.event.PasswordChanged;
+import com.example.auth.domain.auth.event.PasswordResetCompleted;
+import com.example.auth.domain.auth.event.PasswordResetRequested;
 import com.example.auth.domain.auth.event.RefreshReuseDetected;
 import com.example.auth.domain.auth.event.SessionRevoked;
 import org.slf4j.Logger;
@@ -35,5 +38,20 @@ public class SecurityEventLogger {
     @EventListener
     public void onRefreshReuseDetected(RefreshReuseDetected event) {
         log.warn("리프레시 재사용(탈취) 감지 — 패밀리 무효화 userId={} sessionId={}", event.userId(), event.sessionId());
+    }
+
+    @EventListener
+    public void onPasswordResetRequested(PasswordResetRequested event) {
+        log.info("비밀번호 재설정 요청 userId={}", event.userId());
+    }
+
+    @EventListener
+    public void onPasswordResetCompleted(PasswordResetCompleted event) {
+        log.info("비밀번호 재설정 완료 userId={}", event.userId());
+    }
+
+    @EventListener
+    public void onPasswordChanged(PasswordChanged event) {
+        log.info("비밀번호 변경 userId={}", event.userId());
     }
 }

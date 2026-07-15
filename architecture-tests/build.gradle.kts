@@ -19,6 +19,7 @@ dependencies {
     testImplementation(project(":module-domains:domain-auth"))
     testImplementation(project(":module-infra:infra-crypto"))
     testImplementation(project(":module-infra:infra-redis"))
+    testImplementation(project(":module-external:external-notification"))
     testImplementation(project(":module-apps:app-api"))
     testImplementation(project(":module-apps:app-migration"))
 }
