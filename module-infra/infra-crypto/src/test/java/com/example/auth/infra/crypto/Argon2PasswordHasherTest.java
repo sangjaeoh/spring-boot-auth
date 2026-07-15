@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 
 class Argon2PasswordHasherTest {
 
-    private final Argon2PasswordHasher hasher = new Argon2PasswordHasher(16, 32, 1, 19456, 2);
+    private final Argon2PasswordHasher hasher = new Argon2PasswordHasher(16, 32, 1, 19456, 2, 2, 1000);
 
     @Test
     void hashesAndMatches() {
