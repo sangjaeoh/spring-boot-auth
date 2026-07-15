@@ -31,6 +31,7 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.requestMatchers(
+                                "/.well-known/jwks.json",
                                 "/auth/login",
                                 "/auth/token/refresh",
                                 "/auth/password/reset/initiate",

@@ -8,6 +8,10 @@ import com.example.auth.app.api.presentation.v1.LoginRequest;
 import com.example.auth.app.api.presentation.v1.MeResponse;
 import com.example.auth.app.api.presentation.v1.RefreshRequest;
 import com.example.auth.app.api.presentation.v1.TokenResponse;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jwt.SignedJWT;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +23,9 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -118,6 +125,33 @@ class AuthApiE2EIT {
                         .getStatusCode()
                         .value())
                 .isEqualTo(401);
+    }
+
+    @Test
+    void jwksEndpointPublishesPublicKeysThatVerifyIssuedTokens() throws Exception {
+        UUID userId = UUID.randomUUID();
+        provisioning.provision(userId, "dave@example.com", "secret123");
+        TokenResponse tokens = login("dave@example.com", "secret123");
+
+        // JWKS는 인증 없이 접근 가능(permitAll).
+        ResponseEntity<String> jwksResponse = rest.getForEntity("/.well-known/jwks.json", String.class);
+        assertThat(jwksResponse.getStatusCode().value()).isEqualTo(200);
+
+        JWKSet published = JWKSet.parse(requireNonNull(jwksResponse.getBody()));
+        assertThat(published.getKeys()).isNotEmpty();
+        assertThat(published.getKeys())
+                .allSatisfy(key -> assertThat(key.isPrivate()).isFalse());
+
+        // 발급 토큰의 kid가 게시 키에 존재하고, 게시된 공개키로 실제 검증이 성립한다(게시 계약의 실질 증명).
+        String tokenKid = SignedJWT.parse(tokens.accessToken()).getHeader().getKeyID();
+        assertThat(published.getKeyByKeyId(tokenKid)).isNotNull();
+
+        JWKSource<SecurityContext> publishedSource = (selector, context) -> selector.select(published);
+        Jwt decoded = NimbusJwtDecoder.withJwkSource(publishedSource)
+                .jwsAlgorithm(SignatureAlgorithm.RS256)
+                .build()
+                .decode(tokens.accessToken());
+        assertThat(decoded.getSubject()).isEqualTo(userId.toString());
     }
 
     private TokenResponse login(String email, String password) {

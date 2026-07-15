@@ -21,4 +21,7 @@ dependencies {
 
     testImplementation(libs.spring.boot.resttestclient)
     testImplementation(libs.spring.boot.restclient)
+    // JWKS 왕복검증 E2E: 게시된 공개키로 실제 발급 토큰을 디코드해 계약을 증명한다(Nimbus는 common-auth의
+    // implementation 의존이라 app-api 테스트 컴파일 클래스패스에 전이되지 않으므로 명시).
+    testImplementation(libs.spring.security.oauth2.jose)
 }
