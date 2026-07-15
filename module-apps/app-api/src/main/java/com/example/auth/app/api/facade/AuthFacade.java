@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import com.example.auth.app.api.presentation.v1.TokenResponse;
 import com.example.auth.common.auth.jwt.JwtIssuer;
+import com.example.auth.common.messaging.MessagePublisher;
 import com.example.auth.domain.auth.entity.FailureReason;
 import com.example.auth.domain.auth.entity.LoginResult;
 import com.example.auth.domain.auth.event.LoggedIn;
@@ -24,7 +25,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
@@ -43,7 +43,7 @@ public class AuthFacade {
     private final LoginAttemptAppender loginAttemptAppender;
     private final SessionProcessor sessionProcessor;
     private final JwtIssuer jwtIssuer;
-    private final ApplicationEventPublisher eventPublisher;
+    private final MessagePublisher messagePublisher;
     private final Duration accessTtl;
 
     public AuthFacade(
@@ -52,14 +52,14 @@ public class AuthFacade {
             LoginAttemptAppender loginAttemptAppender,
             SessionProcessor sessionProcessor,
             JwtIssuer jwtIssuer,
-            ApplicationEventPublisher eventPublisher,
+            MessagePublisher messagePublisher,
             @Value("${auth.access.ttl-minutes:15}") int accessTtlMinutes) {
         this.authAccountReader = authAccountReader;
         this.passwordCredentialReader = passwordCredentialReader;
         this.loginAttemptAppender = loginAttemptAppender;
         this.sessionProcessor = sessionProcessor;
         this.jwtIssuer = jwtIssuer;
-        this.eventPublisher = eventPublisher;
+        this.messagePublisher = messagePublisher;
         this.accessTtl = Duration.ofMinutes(accessTtlMinutes);
     }
 
@@ -87,7 +87,7 @@ public class AuthFacade {
 
         SessionCreated session = sessionProcessor.createSession(account.userId(), null, ip, userAgent, now);
         loginAttemptAppender.record(account.userId(), LoginResult.SUCCESS, null, ip, null, 0, now);
-        eventPublisher.publishEvent(new LoggedIn(account.userId(), session.sessionId(), now));
+        messagePublisher.publish(new LoggedIn(account.userId(), session.sessionId(), now));
         String accessToken =
                 jwtIssuer.issueAccess(account.userId(), session.sessionId(), DEFAULT_ROLES, accessTtl, now);
         return new TokenResponse(accessToken, session.refreshToken(), accessTtl.toSeconds());
@@ -122,7 +122,7 @@ public class AuthFacade {
 
     private void fail(@Nullable UUID userId, FailureReason reason, String ip, Instant now) {
         loginAttemptAppender.record(userId, LoginResult.FAILURE, reason, ip, null, 0, now);
-        eventPublisher.publishEvent(new LoginFailed(userId, reason, now));
+        messagePublisher.publish(new LoginFailed(userId, reason, now));
         throw new AuthException(AuthErrorCode.AUTHENTICATION_FAILED);
     }
 }

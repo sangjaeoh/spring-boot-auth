@@ -11,6 +11,8 @@ dependencies {
 
     runtimeOnly(project(":module-domains:domain-auth"))
     runtimeOnly(project(":module-domains:domain-user"))
+    // msg 스키마(디둡·DLQ)는 infra-messaging이 소유한다 — 마이그레이션 리소스 탑재용.
+    runtimeOnly(project(":module-infra:infra-messaging"))
 
     implementation(libs.spring.boot.starter.jdbc)
 

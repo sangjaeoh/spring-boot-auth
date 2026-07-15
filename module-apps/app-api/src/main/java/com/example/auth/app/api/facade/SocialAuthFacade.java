@@ -7,6 +7,7 @@ import com.example.auth.app.api.presentation.v1.SocialRegistrationCompleteRespon
 import com.example.auth.app.api.presentation.v1.SocialRegistrationResponse;
 import com.example.auth.app.api.presentation.v1.TokenResponse;
 import com.example.auth.common.auth.jwt.JwtIssuer;
+import com.example.auth.common.messaging.MessagePublisher;
 import com.example.auth.domain.auth.entity.FailureReason;
 import com.example.auth.domain.auth.entity.LoginResult;
 import com.example.auth.domain.auth.entity.SocialProvider;
@@ -33,7 +34,6 @@ import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
@@ -56,7 +56,7 @@ public class SocialAuthFacade {
     private final LoginAttemptAppender loginAttemptAppender;
     private final SessionProcessor sessionProcessor;
     private final JwtIssuer jwtIssuer;
-    private final ApplicationEventPublisher eventPublisher;
+    private final MessagePublisher messagePublisher;
     private final Duration accessTtl;
 
     public SocialAuthFacade(
@@ -67,7 +67,7 @@ public class SocialAuthFacade {
             LoginAttemptAppender loginAttemptAppender,
             SessionProcessor sessionProcessor,
             JwtIssuer jwtIssuer,
-            ApplicationEventPublisher eventPublisher,
+            MessagePublisher messagePublisher,
             @Value("${auth.access.ttl-minutes:15}") int accessTtlMinutes) {
         this.socialConnectionProcessor = socialConnectionProcessor;
         this.registrationSessionProcessor = registrationSessionProcessor;
@@ -76,7 +76,7 @@ public class SocialAuthFacade {
         this.loginAttemptAppender = loginAttemptAppender;
         this.sessionProcessor = sessionProcessor;
         this.jwtIssuer = jwtIssuer;
-        this.eventPublisher = eventPublisher;
+        this.messagePublisher = messagePublisher;
         this.accessTtl = Duration.ofMinutes(accessTtlMinutes);
     }
 
@@ -115,12 +115,13 @@ public class SocialAuthFacade {
      */
     public SocialRegistrationCompleteResponse completeRegistration(
             UUID registrationId, String onboardingToken, String ip, @Nullable String userAgent) {
+        Instant now = Instant.now();
         RegistrationCompletionInfo completion = registrationSessionProcessor.complete(registrationId, onboardingToken);
         UUID userId = accountRegistrationProcessor.registerSocial(completion);
         registrationSessionProcessor.consume(registrationId);
-        eventPublisher.publishEvent(
-                new SocialConnected(userId, requireNonNull(completion.social()).provider()));
-        TokenResponse tokens = issueSession(userId, ip, userAgent, Instant.now());
+        messagePublisher.publish(
+                new SocialConnected(userId, requireNonNull(completion.social()).provider(), now));
+        TokenResponse tokens = issueSession(userId, ip, userAgent, now);
         return new SocialRegistrationCompleteResponse(
                 userId, tokens.accessToken(), tokens.refreshToken(), tokens.expiresInSeconds());
     }
@@ -130,7 +131,7 @@ public class SocialAuthFacade {
      */
     public void connect(UUID userId, SocialProvider provider, String idToken) {
         socialConnectionProcessor.connect(userId, provider, idToken);
-        eventPublisher.publishEvent(new SocialConnected(userId, provider));
+        messagePublisher.publish(new SocialConnected(userId, provider, Instant.now()));
     }
 
     /**
@@ -138,20 +139,20 @@ public class SocialAuthFacade {
      */
     public void disconnect(UUID userId, SocialProvider provider) {
         socialConnectionProcessor.disconnect(userId, provider);
-        eventPublisher.publishEvent(new SocialDisconnected(userId, provider));
+        messagePublisher.publish(new SocialDisconnected(userId, provider, Instant.now()));
     }
 
     private TokenResponse issueSession(UUID userId, String ip, @Nullable String userAgent, Instant now) {
         SessionCreated session = sessionProcessor.createSession(userId, null, ip, userAgent, now);
         loginAttemptAppender.record(userId, LoginResult.SUCCESS, null, ip, null, 0, now);
-        eventPublisher.publishEvent(new LoggedIn(userId, session.sessionId(), now));
+        messagePublisher.publish(new LoggedIn(userId, session.sessionId(), now));
         String accessToken = jwtIssuer.issueAccess(userId, session.sessionId(), DEFAULT_ROLES, accessTtl, now);
         return new TokenResponse(accessToken, session.refreshToken(), accessTtl.toSeconds());
     }
 
     private void fail(UUID userId, FailureReason reason, String ip, Instant now) {
         loginAttemptAppender.record(userId, LoginResult.FAILURE, reason, ip, null, 0, now);
-        eventPublisher.publishEvent(new LoginFailed(userId, reason, now));
+        messagePublisher.publish(new LoginFailed(userId, reason, now));
         throw new AuthException(AuthErrorCode.SOCIAL_TOKEN_INVALID);
     }
 }

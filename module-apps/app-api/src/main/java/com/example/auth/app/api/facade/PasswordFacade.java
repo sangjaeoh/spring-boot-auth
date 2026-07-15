@@ -3,6 +3,7 @@ package com.example.auth.app.api.facade;
 import static java.util.Objects.requireNonNull;
 
 import com.example.auth.common.core.id.UuidV7Generator;
+import com.example.auth.common.messaging.MessagePublisher;
 import com.example.auth.domain.auth.event.PasswordResetRequested;
 import com.example.auth.domain.auth.exception.AuthErrorCode;
 import com.example.auth.domain.auth.exception.AuthException;
@@ -17,7 +18,6 @@ import com.example.auth.domain.auth.service.VerificationChallengeProcessor;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
@@ -40,7 +40,7 @@ public class PasswordFacade {
     private final PasswordCredentialModifier passwordCredentialModifier;
     private final PasswordPolicyValidator policyValidator;
     private final SessionProcessor sessionProcessor;
-    private final ApplicationEventPublisher eventPublisher;
+    private final MessagePublisher messagePublisher;
 
     public PasswordFacade(
             AuthAccountReader authAccountReader,
@@ -48,13 +48,13 @@ public class PasswordFacade {
             PasswordCredentialModifier passwordCredentialModifier,
             PasswordPolicyValidator policyValidator,
             SessionProcessor sessionProcessor,
-            ApplicationEventPublisher eventPublisher) {
+            MessagePublisher messagePublisher) {
         this.authAccountReader = authAccountReader;
         this.challengeProcessor = challengeProcessor;
         this.passwordCredentialModifier = passwordCredentialModifier;
         this.policyValidator = policyValidator;
         this.sessionProcessor = sessionProcessor;
-        this.eventPublisher = eventPublisher;
+        this.messagePublisher = messagePublisher;
     }
 
     /**
@@ -67,7 +67,7 @@ public class PasswordFacade {
         }
         UUID userId = account.orElseThrow().userId();
         String challengeId = challengeProcessor.issue(userId, NotificationChannel.EMAIL, email);
-        eventPublisher.publishEvent(new PasswordResetRequested(userId));
+        messagePublisher.publish(new PasswordResetRequested(userId, Instant.now()));
         return challengeId;
     }
 
