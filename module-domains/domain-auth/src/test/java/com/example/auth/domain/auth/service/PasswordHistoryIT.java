@@ -113,7 +113,8 @@ class PasswordHistoryIT {
         assertThat(KDF_TX_ACTIVITY).isNotEmpty().containsOnly(false);
 
         // 변경·재설정 결과는 정상 커밋됐다(재설정 후 해시 반영 + 직전 비번 재사용 거부).
-        assertThat(repository.findById(userId).orElseThrow().getPasswordHash()).isEqualTo(FAKE_HASHER.hash("password2"));
+        assertThat(repository.findById(userId).orElseThrow().getPasswordHash())
+                .isEqualTo(FAKE_HASHER.hash("password2"));
         assertThatThrownBy(() -> modifier.resetTo(userId, "password1", t0.plus(Duration.ofSeconds(3))))
                 .isInstanceOf(AuthException.class);
     }

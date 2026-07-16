@@ -29,7 +29,8 @@ public class RedisClientConfig {
     public LettuceClientConfigurationBuilderCustomizer lettuceFailureBehaviorCustomizer(
             @Value("${spring.data.redis.connect-timeout:250ms}") Duration connectTimeout) {
         return builder -> builder.clientOptions(ClientOptions.builder()
-                .socketOptions(SocketOptions.builder().connectTimeout(connectTimeout).build())
+                .socketOptions(
+                        SocketOptions.builder().connectTimeout(connectTimeout).build())
                 .disconnectedBehavior(ClientOptions.DisconnectedBehavior.REJECT_COMMANDS)
                 .timeoutOptions(TimeoutOptions.enabled())
                 .build());

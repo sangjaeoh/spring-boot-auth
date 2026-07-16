@@ -34,9 +34,10 @@ class JwtRotationVerificationTest {
 
     @Test
     void tokenSignedBeforeRotationStillVerifiesWithinGraceButNotAfter() throws ParseException {
-        SigningKeyRing ring = new SigningKeyRing(GRACE);
+        SigningKeyRing ring = new SigningKeyRing(new InMemorySigningKeyStore(), GRACE);
         // 검증 키셋의 논리 시계를 가변 캡처한다(1원소 배열 — 유예 만료 시점을 결정적으로 제어).
-        Instant[] clock = {Instant.parse("2026-01-01T00:00:00Z")};
+        // 회전·게시 판정은 createdAt 기반이라 논리 시계도 부트스트랩(now) 이후에서 시작한다.
+        Instant[] clock = {Instant.now().plus(Duration.ofMinutes(1))};
 
         JwtEncoder encoder =
                 new NimbusJwtEncoder((selector, context) -> selector.select(new JWKSet(ring.currentSigningKey())));
@@ -78,7 +79,7 @@ class JwtRotationVerificationTest {
     @Test
     void expiredTokenIsRejected() {
         // 디코더 배선(withJwkSource)이 표준 exp 검증을 유지함을 핀한다(단수명 Access 제품 명제의 전제).
-        SigningKeyRing ring = new SigningKeyRing(GRACE);
+        SigningKeyRing ring = new SigningKeyRing(new InMemorySigningKeyStore(), GRACE);
         JwtEncoder encoder =
                 new NimbusJwtEncoder((selector, context) -> selector.select(new JWKSet(ring.currentSigningKey())));
         JWKSource<SecurityContext> verificationSource =

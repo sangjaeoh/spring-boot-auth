@@ -8,6 +8,8 @@ dependencies {
     implementation(platform(libs.spring.boot.dependencies))
     implementation(project(":module-common:common-core"))
     implementation(libs.spring.security.oauth2.jose)
+    // 회전 스케줄러 로깅용 API(스타터 없이, 버전은 BOM).
+    implementation(libs.slf4j.api)
 
     testImplementation(libs.spring.boot.starter.test)
     testRuntimeOnly(libs.junit.platform.launcher)
