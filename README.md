@@ -52,16 +52,12 @@ graph TD
 
 ## 로컬에서 실행하기
 
-컨테이너 스택으로 prod에 가까운 형태로 기동합니다. Docker가 필요합니다.
+컨테이너 스택으로 전체 앱을 한 번에 띄웁니다. Docker만 있으면 됩니다.
 
 ```bash
 git clone https://github.com/sangjaeoh/spring-boot-auth.git
 cd spring-boot-auth
-./scripts/generate-dev-secrets.sh                            # 최초 1회 — PII 암호화 KEK·blind index pepper 생성
-docker build --build-arg APP=app-migration -t auth-migration .
-docker build --build-arg APP=app-api       -t auth-api .
-docker build --build-arg APP=app-admin     -t auth-admin .
-docker compose -f docker-compose.stack.yml up
+docker compose up --build
 ```
 
 `app-migration`을 init 컨테이너로 선행 실행해 스키마별 Flyway를 전량 적용하고 성공 종료한 뒤 API·Admin을 띄웁니다. 앱 이미지를 컨테이너 안에서 빌드하므로 첫 실행은 수 분 걸립니다.
@@ -70,14 +66,16 @@ docker compose -f docker-compose.stack.yml up
 - Admin: `http://localhost:8081`
 - OpenAPI 계약(스펙): `http://localhost:8080/v3/api-docs`
 
+> 로컬 스택은 dev 전용 고정 암호화 키(throwaway)로 PII를 암호화합니다 — `POSTGRES_PASSWORD`와 같은 성격의 개발값입니다. 운영 배포는 시크릿 매니저가 같은 변수명으로 키를 주입합니다([`docs/ops/deployment.md`](docs/ops/deployment.md)).
+
 ## IDE에서 작업하기
 
 코드를 수정하며 돌릴 때는 로컬 JVM으로 실행합니다. JDK 25와 Docker가 필요합니다.
 
-1. PostgreSQL·Redis를 띄웁니다.
+1. PostgreSQL·Redis만 띄웁니다(앱은 Gradle로 직접 실행).
 
    ```bash
-   docker compose up -d --wait
+   docker compose up -d postgres redis --wait
    ```
 
 2. 개발 시크릿을 만들어 셸에 주입합니다. 앱은 PII 암호화 키가 없으면 기동 시 fail-fast합니다.
