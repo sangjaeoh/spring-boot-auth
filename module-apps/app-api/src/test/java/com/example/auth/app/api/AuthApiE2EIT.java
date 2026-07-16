@@ -104,6 +104,17 @@ class AuthApiE2EIT {
     }
 
     @Test
+    void dotlessDomainEmailIsRejectedAtBoundaryAsBadRequest() {
+        // Jakarta @Email이 통과시키던 점 없는 도메인 — 경계 @Pattern이 걸러 도메인 Email IAE 500을 막는다.
+        ResponseEntity<String> response = rest.postForEntity(
+                "/auth/login",
+                new LoginRequest("eve@nodot", "secret123", DeviceBindingRequestFixture.webDevice()),
+                String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
     void unauthenticatedRequestIsRejected() {
         ResponseEntity<String> response = rest.getForEntity("/auth/me", String.class);
 
