@@ -18,6 +18,8 @@ spring:
       host: localhost
       port: 6379
       timeout: 250ms
+      # 연결 수립 stall 상한. 재연결 중 명령 큐잉 거부(REJECT_COMMANDS)와 함께 RedisClientConfig가 조립한다.
+      connect-timeout: 250ms
 
 server:
   # app-api(8080)와 분리 기동한다(어드민은 내부망 노출 전제).

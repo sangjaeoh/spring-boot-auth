@@ -33,4 +33,15 @@ public class RedisSessionConfig {
         script.setResultType(String.class);
         return script;
     }
+
+    /**
+     * 전 세션 원자 무효화 Lua 스크립트를 로드한다.
+     */
+    @Bean
+    public RedisScript<Long> revokeAllSessionsScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setLocation(new ClassPathResource("redis/revoke_all_sessions.lua"));
+        script.setResultType(Long.class);
+        return script;
+    }
 }

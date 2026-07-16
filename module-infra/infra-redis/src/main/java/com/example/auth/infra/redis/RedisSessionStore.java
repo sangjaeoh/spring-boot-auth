@@ -28,8 +28,8 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 /**
- * Redis 기반 세션 스토어다(진실원본). 생성(동시 세션 상한 검증 + 최오래 축출)과 회전은 Lua로 원자
- * 판정한다.
+ * Redis 기반 세션 스토어다(진실원본). 생성(동시 세션 상한 검증 + 최오래 축출)·회전·전체 무효화는 Lua로
+ * 원자 판정한다.
  *
  * <p>키는 {@link SessionKeys}가 {@code {u:userId}} 해시태그로 단일 슬롯을 이뤄 Cluster에서도 Lua 원자성을
  * 보존한다. 저장소 예외 처리는 판정 지점별로 다르다 — 읽기 핫패스 {@code validate}는 fail-closed로 무효
@@ -47,6 +47,7 @@ public class RedisSessionStore implements SessionStore {
     private final StringRedisTemplate redis;
     private final RedisScript<String> rotateScript;
     private final RedisScript<String> createScript;
+    private final RedisScript<Long> revokeAllScript;
     private final int revokeMinReplicas;
     private final Duration revokeReplicaTimeout;
 
@@ -54,11 +55,13 @@ public class RedisSessionStore implements SessionStore {
             StringRedisTemplate redis,
             @Qualifier("rotateSessionScript") RedisScript<String> rotateSessionScript,
             @Qualifier("createSessionScript") RedisScript<String> createSessionScript,
+            @Qualifier("revokeAllSessionsScript") RedisScript<Long> revokeAllSessionsScript,
             @Value("${auth.session.revoke-durability.min-replicas:0}") int revokeMinReplicas,
             @Value("${auth.session.revoke-durability.timeout-ms:250}") long revokeReplicaTimeoutMs) {
         this.redis = redis;
         this.rotateScript = rotateSessionScript;
         this.createScript = createSessionScript;
+        this.revokeAllScript = revokeAllSessionsScript;
         this.revokeMinReplicas = revokeMinReplicas;
         this.revokeReplicaTimeout = Duration.ofMillis(revokeReplicaTimeoutMs);
     }
@@ -234,13 +237,7 @@ public class RedisSessionStore implements SessionStore {
     @Override
     public void revokeAll(UUID userId) {
         try {
-            Set<String> members = redis.opsForZSet().range(SessionKeys.indexKey(userId), 0, -1);
-            if (members != null) {
-                for (String sessionId : members) {
-                    redis.delete(SessionKeys.sessionPrefix(userId) + sessionId);
-                }
-            }
-            redis.delete(SessionKeys.indexKey(userId));
+            redis.execute(revokeAllScript, List.of(SessionKeys.indexKey(userId)), SessionKeys.sessionPrefix(userId));
             awaitRevokeDurability();
         } catch (DataAccessException e) {
             log.warn("세션 전체 무효화 중 Redis 예외 — fail-closed(503)", e);

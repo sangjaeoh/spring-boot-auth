@@ -20,9 +20,10 @@ spring:
       host: localhost
       port: 6379
       # 정상 연결의 명령 타임아웃 상한 — 멈춘 노드(부분 failover)에서 fail-closed 지연을 유계로 만든다.
-      # 연결단 stall(connectTimeout)·재연결 큐잉(disconnectedBehavior)은 별도이며 Lettuce 옵션 후속(REDIS_HA.md).
       # prod Cluster 노드 접속(spring.data.redis.cluster.nodes 등)은 배포 오버레이가 소유.
       timeout: 250ms
+      # 연결 수립 stall 상한. 재연결 중 명령 큐잉 거부(REJECT_COMMANDS)와 함께 RedisClientConfig가 조립한다.
+      connect-timeout: 250ms
 
 # PII 봉투 암호화·blind index 키(dev 정적). prod는 시크릿 매니저 주입 + 분리 보관(pepper 유출 시 blind index
 # 역추론 가능). keys/peppers는 "version:base64[,version:base64]" — 회전 시 새 버전 추가 + active-version 상향
