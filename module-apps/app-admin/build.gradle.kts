@@ -26,6 +26,9 @@ dependencies {
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.security)
     implementation(libs.spring.boot.starter.validation)
+    // 관측성: health probe + Prometheus 메트릭(관리 포트 분리 — app-api와 동일).
+    implementation(libs.spring.boot.starter.actuator)
+    runtimeOnly(libs.micrometer.registry.prometheus)
     // @EnableJpaRepositories·@EntityScan을 컴파일하려면 JPA가 컴파일 클래스패스에 필요하다(app-api와 동일).
     implementation(libs.spring.boot.starter.data.jpa)
     runtimeOnly(libs.spring.boot.starter.data.redis)

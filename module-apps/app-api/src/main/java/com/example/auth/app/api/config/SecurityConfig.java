@@ -34,6 +34,10 @@ public class SecurityConfig {
                 // 프레임워크 sendError(역직렬화 400 등)의 ERROR 디스패치가 /error에서 401로 둔갑하지 않게 허용.
                 .authorizeHttpRequests(auth -> auth.dispatcherTypeMatchers(DispatcherType.ERROR)
                         .permitAll()
+                        // 관리 엔드포인트는 분리된 관리 포트에만 매핑된다(내부망 전용 — application.yml
+                        // management 블록). 체인은 permitAll하고 격리는 네트워크가 소유한다.
+                        .requestMatchers("/actuator/**")
+                        .permitAll()
                         .requestMatchers(
                                 "/.well-known/jwks.json",
                                 "/auth/login",
