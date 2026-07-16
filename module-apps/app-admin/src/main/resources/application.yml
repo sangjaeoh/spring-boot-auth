@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: auth-admin
+  datasource:
+    url: jdbc:postgresql://localhost:5432/auth
+    username: auth
+    password: auth
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  autoconfigure:
+    # app-api와 동일 — 다중 스키마는 SchemaMigrationConfig가 스키마별 실행(Boot 단일 Flyway는 버전 충돌).
+    exclude:
+      - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 250ms
+
+server:
+  # app-api(8080)와 분리 기동한다(어드민은 내부망 노출 전제).
+  port: 8081
+
+# PII 봉투 암호화·blind index 키(dev 정적 — app-api와 동일 키). prod는 시크릿 매니저 주입.
+crypto:
+  envelope:
+    active-version: 1
+    keys: "1:vO5tqt9e8TOJ/R/qBbltt+FHyWJdL0khopfmCTfTxFo="
+  blind-index:
+    active-version: 1
+    peppers: "1:RqbTfuuNIU/NaYFmNMpGwU7jj0e+9YXIOytVeqnh4Ms="
+
+app:
+  migration:
+    # 어드민이 접근하는 스키마(기동 검증용 — 운영 배포에서는 app-migration이 선행 실행된다).
+    schemas: auth,usr,msg,generic
+
+user:
+  retention:
+    rejoin-cooldown-days: 30
+    dormancy-months: 12
+    dormancy-notice-days: 30
+    verification-pii-purge-days: 5
+    ci-tombstone-months: 6
+    consent-retention-years: 5
+  identity-verification:
+    ttl-minutes: 10
+    mode: mock
+
+auth:
+  retention:
+    login-attempt-years: 2
+    login-ip-anonymize-days: 90

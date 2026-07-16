@@ -6,6 +6,9 @@ import com.example.auth.domain.auth.entity.LockReason;
 import com.example.auth.domain.auth.entity.LockState;
 import com.example.auth.domain.auth.event.AccountLocked;
 import com.example.auth.domain.auth.event.AccountUnlocked;
+import com.example.auth.domain.auth.exception.AuthErrorCode;
+import com.example.auth.domain.auth.exception.AuthException;
+import com.example.auth.domain.auth.info.LockReleaseInfo;
 import com.example.auth.domain.auth.port.LoginFailureCounter;
 import com.example.auth.domain.auth.repository.AuthAccountRepository;
 import java.time.Duration;
@@ -21,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 성공 로그인 시 카운터 리셋.
  *
  * <p>카운터 창은 쿨다운과 같다 — 창 경과 시 카운터가 자동 소멸해 "연속" 실패만 잠금으로 이어진다.
- * 관리자 잠금(ADMIN_LOCKED) 전이는 관리자 콘솔 슬라이스가 소유한다.
+ * 관리자 잠금(ADMIN_LOCKED)의 전이·해제도 함께 소유한다(쿨다운 자동 해제 비대상 — 관리자 해제만).
  */
 @Service
 public class AccountLockProcessor {
@@ -75,6 +78,39 @@ public class AccountLockProcessor {
      */
     public void resetFailures(UUID userId) {
         loginFailureCounter.reset(userId);
+    }
+
+    /**
+     * 관리자 명령으로 계정을 잠근다(NONE → ADMIN_LOCKED). {@link AccountLocked}를 발행한다.
+     *
+     * @throws AuthException 미존재 계정(404), 이미 잠긴 계정이면(409)
+     */
+    @Transactional
+    public void lockByAdmin(UUID userId, Instant now) {
+        AuthAccount account = getWithLock(userId);
+        account.lockByAdmin(now);
+        messagePublisher.publish(new AccountLocked(userId, now));
+    }
+
+    /**
+     * 관리자 명령으로 잠금을 해제하고(TEMP_LOCKED·ADMIN_LOCKED → NONE) 해제 직전 잠금 스냅샷을
+     * 반환한다. {@link AccountUnlocked}를 발행한다.
+     *
+     * @throws AuthException 미존재 계정(404), 잠기지 않은 계정이면(409)
+     */
+    @Transactional
+    public LockReleaseInfo unlockByAdmin(UUID userId, Instant now) {
+        AuthAccount account = getWithLock(userId);
+        LockReleaseInfo released = new LockReleaseInfo(account.getLockState(), account.getLockReason());
+        account.releaseLockByAdmin();
+        messagePublisher.publish(new AccountUnlocked(userId, now));
+        return released;
+    }
+
+    private AuthAccount getWithLock(UUID userId) {
+        return authAccountRepository
+                .findWithLockByUserId(userId)
+                .orElseThrow(() -> new AuthException(AuthErrorCode.ACCOUNT_NOT_FOUND));
     }
 
     /**

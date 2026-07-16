@@ -1,6 +1,8 @@
 package com.example.auth.domain.auth.entity;
 
 import com.example.auth.common.jpa.entity.BaseTimeEntity;
+import com.example.auth.domain.auth.exception.AuthErrorCode;
+import com.example.auth.domain.auth.exception.AuthException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
@@ -104,6 +106,35 @@ public class AuthAccount extends BaseTimeEntity<UUID> {
         this.lockState = LockState.TEMP_LOCKED;
         this.lockReason = reason;
         this.lockedAt = at;
+    }
+
+    /**
+     * 관리자 명령으로 잠금한다(NONE → ADMIN_LOCKED). 쿨다운 자동 해제 대상이 아니며 관리자 해제만
+     * 가능하다.
+     *
+     * @throws AuthException 이미 잠긴 계정이면(409)
+     */
+    public void lockByAdmin(Instant at) {
+        if (lockState != LockState.NONE) {
+            throw new AuthException(AuthErrorCode.ACCOUNT_ALREADY_LOCKED);
+        }
+        this.lockState = LockState.ADMIN_LOCKED;
+        this.lockReason = LockReason.ADMIN_ACTION;
+        this.lockedAt = at;
+    }
+
+    /**
+     * 관리자 명령으로 잠금을 해제한다(TEMP_LOCKED·ADMIN_LOCKED → NONE).
+     *
+     * @throws AuthException 잠기지 않은 계정이면(409)
+     */
+    public void releaseLockByAdmin() {
+        if (lockState == LockState.NONE) {
+            throw new AuthException(AuthErrorCode.ACCOUNT_NOT_LOCKED);
+        }
+        this.lockState = LockState.NONE;
+        this.lockReason = null;
+        this.lockedAt = null;
     }
 
     /**
