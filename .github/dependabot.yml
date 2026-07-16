@@ -1,0 +1,13 @@
+# SCA(소프트웨어 구성요소 분석) 최소안 — Gradle 의존성·GitHub Actions의 취약 버전을 주간 스캔해 PR로 올린다.
+# 운영 규약(트리아지·머지 게이트)은 docs/ops/threat-model.md의 SCA 절이 소유한다.
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

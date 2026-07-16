@@ -104,6 +104,26 @@ class AuthApiE2EIT {
     }
 
     @Test
+    void nonexistentAccountLoginIsIndistinguishableFromWrongPassword() {
+        provisioning.provision("parity@example.com", "secret123");
+
+        ResponseEntity<String> wrongPassword = rest.postForEntity(
+                "/auth/login",
+                new LoginRequest("parity@example.com", "wrongpass1", DeviceBindingRequestFixture.webDevice()),
+                String.class);
+        ResponseEntity<String> nonexistent = rest.postForEntity(
+                "/auth/login",
+                new LoginRequest("no-such-user@example.com", "wrongpass1", DeviceBindingRequestFixture.webDevice()),
+                String.class);
+
+        // 열거 저항: 존재/비존재 계정의 응답이 상태·본문까지 동일해야 계정 존재가 새지 않는다
+        // (ProblemDetail은 가변 필드가 없어 본문 완전 일치로 단언한다 — docs/ops/threat-model.md).
+        assertThat(nonexistent.getStatusCode().value()).isEqualTo(401);
+        assertThat(nonexistent.getStatusCode()).isEqualTo(wrongPassword.getStatusCode());
+        assertThat(nonexistent.getBody()).isEqualTo(wrongPassword.getBody());
+    }
+
+    @Test
     void dotlessDomainEmailIsRejectedAtBoundaryAsBadRequest() {
         // Jakarta @Email이 통과시키던 점 없는 도메인 — 경계 @Pattern이 걸러 도메인 Email IAE 500을 막는다.
         ResponseEntity<String> response = rest.postForEntity(
