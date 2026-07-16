@@ -13,15 +13,16 @@ import java.time.Instant;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 비밀번호 변경·재설정을 수행한다(정책·최근 N 재사용 금지 강제).
  *
- * <p>변경·재설정은 저빈도 조작이라 KDF(현재 대조·재사용 대조·신규 인코딩)를 트랜잭션 안에서 수행하고
- * 자격증명과 이력을 한 트랜잭션에 원자적으로 갱신한다. KDF는 동시성 상한 리미터를 거치므로 로그인 폭주로
- * 리미터가 포화되면 슬롯 대기만큼 커넥션을 점유할 수 있으나, 변경·재설정은 동시 실행 수가 작아 소모 커넥션이
- * 유계라 수용한다.
+ * <p>KDF(현재 대조·재사용 대조·신규 인코딩)는 로그인 경로처럼 DB 트랜잭션 밖에서 수행한다 — KDF는 동시성
+ * 상한 리미터를 거치므로 리미터 포화 시 슬롯 대기만큼 커넥션을 점유하지 않게 한다. 자격증명·이력 갱신만
+ * 짧은 트랜잭션으로 원자 커밋하고, 변경은 커밋 직전 현재 해시가 대조 시점과 같은지 재확인해 KDF와 커밋
+ * 사이의 동시 변경을 불일치로 거부한다(재설정은 챌린지가 인가라 최종 쓰기가 이긴다).
  */
 @Service
 public class PasswordCredentialModifier {
@@ -30,6 +31,7 @@ public class PasswordCredentialModifier {
     private final PasswordHasher passwordHasher;
     private final PasswordPolicyValidator policyValidator;
     private final MessagePublisher messagePublisher;
+    private final TransactionTemplate transactionTemplate;
     private final int historyLimit;
 
     public PasswordCredentialModifier(
@@ -37,27 +39,36 @@ public class PasswordCredentialModifier {
             PasswordHasher passwordHasher,
             PasswordPolicyValidator policyValidator,
             MessagePublisher messagePublisher,
+            PlatformTransactionManager transactionManager,
             @Value("${auth.password.history-size:5}") int historyLimit) {
         this.repository = repository;
         this.passwordHasher = passwordHasher;
         this.policyValidator = policyValidator;
         this.messagePublisher = messagePublisher;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.historyLimit = historyLimit;
     }
 
     /**
      * 현재 비밀번호를 검증한 뒤 정책·재사용 금지를 통과한 새 비밀번호로 교체한다.
      *
-     * @throws AuthException 자격증명 미존재; 현재 비밀번호 불일치; 정책 위반; 재사용
+     * @throws AuthException 자격증명 미존재; 현재 비밀번호 불일치(커밋 직전 동시 변경 감지 포함); 정책 위반;
+     *     재사용
      */
-    @Transactional
     public void change(UUID userId, String currentRaw, String newRaw, Instant now) {
-        PasswordCredential credential = getCredential(userId);
-        if (!passwordHasher.matches(currentRaw, credential.getPasswordHash())) {
+        String verifiedCurrentHash = getCredential(userId).getPasswordHash();
+        if (!passwordHasher.matches(currentRaw, verifiedCurrentHash)) {
             throw new AuthException(AuthErrorCode.CURRENT_PASSWORD_MISMATCH);
         }
-        applyNewPassword(credential, newRaw, now);
-        messagePublisher.publish(new PasswordChanged(userId, now));
+        String newHash = encodeValidatedPassword(userId, newRaw);
+        transactionTemplate.executeWithoutResult(status -> {
+            PasswordCredential credential = getCredential(userId);
+            if (!credential.getPasswordHash().equals(verifiedCurrentHash)) {
+                throw new AuthException(AuthErrorCode.CURRENT_PASSWORD_MISMATCH);
+            }
+            credential.changePassword(newHash, HashAlgorithm.valueOf(passwordHasher.algorithm()), now, historyLimit);
+            messagePublisher.publish(new PasswordChanged(userId, now));
+        });
     }
 
     /**
@@ -65,26 +76,27 @@ public class PasswordCredentialModifier {
      *
      * @throws AuthException 자격증명 미존재; 정책 위반; 재사용
      */
-    @Transactional
     public void resetTo(UUID userId, String newRaw, Instant now) {
-        PasswordCredential credential = getCredential(userId);
-        applyNewPassword(credential, newRaw, now);
-        messagePublisher.publish(new PasswordResetCompleted(userId, now));
+        getCredential(userId);
+        String newHash = encodeValidatedPassword(userId, newRaw);
+        transactionTemplate.executeWithoutResult(status -> {
+            PasswordCredential credential = getCredential(userId);
+            credential.changePassword(newHash, HashAlgorithm.valueOf(passwordHasher.algorithm()), now, historyLimit);
+            messagePublisher.publish(new PasswordResetCompleted(userId, now));
+        });
     }
 
-    private void applyNewPassword(PasswordCredential credential, String newRaw, Instant now) {
+    /**
+     * 정책·재사용 금지를 검증하고 새 비밀번호를 인코딩해 반환한다(트랜잭션 밖 KDF 구간).
+     */
+    private String encodeValidatedPassword(UUID userId, String newRaw) {
         policyValidator.validate(newRaw);
-        rejectIfReused(credential, newRaw);
-        String newHash = passwordHasher.hash(newRaw);
-        credential.changePassword(newHash, HashAlgorithm.valueOf(passwordHasher.algorithm()), now, historyLimit);
-    }
-
-    private void rejectIfReused(PasswordCredential credential, String newRaw) {
-        for (String historicHash : credential.historyHashes()) {
+        for (String historicHash : repository.findHistoryHashes(userId)) {
             if (passwordHasher.matches(newRaw, historicHash)) {
                 throw new AuthException(AuthErrorCode.PASSWORD_REUSED);
             }
         }
+        return passwordHasher.hash(newRaw);
     }
 
     private PasswordCredential getCredential(UUID userId) {
