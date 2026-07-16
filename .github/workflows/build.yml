@@ -3,10 +3,13 @@
 # 태그 릴리스(release-images.yml)는 이 게이트를 통과한 커밋에만 붙인다는 규약.
 name: build
 
+# 자동 실행 비활성화(솔로 레포라 CI 불필요) — push·PR 트리거를 껐다. 되살리려면 아래 주석을 푼다.
+# on:
+#   push:
+#     branches: ["main"]
+#   pull_request:
 on:
-  push:
-    branches: ["main"]
-  pull_request:
+  workflow_dispatch: # 수동 실행만 허용(자동 실행 없음)
 
 permissions:
   contents: read

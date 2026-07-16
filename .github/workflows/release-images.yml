@@ -3,9 +3,12 @@
 # 배포(롤아웃 순서·카나리)는 docs/ops/deployment.md 규약을 따른다.
 name: release-images
 
+# 자동 실행 비활성화(솔로 레포라 CI 불필요) — 태그 푸시 트리거를 껐다. 되살리려면 아래 주석을 푼다.
+# on:
+#   push:
+#     tags: ["v*"]
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch: # 수동 실행만 허용(자동 실행 없음)
 
 permissions:
   contents: read
