@@ -30,7 +30,7 @@
 ## 보안 운영·관리 (Phase 5·6)
 
 - [x] **7. 이상탐지·알림 + 레이트리밋 + 계정 잠금** — `domain-generic`(Notification) 신설·발송 판정 정책(수신설정 AND 기기권한 AND 카테고리, 보안은 opt-out 무시)·수신설정 API·GeoIP/RiskEvaluator(riskScore 산출)·민감 엔드포인트 레이트리밋·인증코드 일일 한도/재발송 쿨다운(1b 이연분)·연속 실패 잠금(TEMP_LOCKED) + 쿨다운 자동 해제. 완료 메모: 실 발송 벤더 어댑터는 골격+설정 스위치(`generic.notification.mode=vendor` — 요청 페이로드 형상은 벤더 계약 확정 후 교체), PUSH는 FCM 골격(APNs는 FCM 중계 전제)이고 발송 대상은 최근 접속 기기 1대(멱등 키가 채널당 1행 — 다중 기기 팬아웃은 후속). 기존 domain-auth 알림 포트는 OTP 전용 `VerificationCodeSender`로 개명(카테고리 알림 포트는 제네릭 소유 — 도메인 간 의존 금지로 포트 분리). 탈퇴 확인 알림은 이벤트 시점에 수신자 주소(PII)가 이미 파기돼 제외. 휴면 사전통지 실 발송 배선은 후속(마킹은 app-batch, 알림 소비자는 app-api — in-process 이벤트가 앱 경계를 넘지 않아 배선 위치 결정 필요). GeoIP 실 벤더 어댑터는 조달 후 항목.
-- [ ] **8. 관리자 콘솔 + RBAC + 감사** — `app-admin` 신설·Role/Permission/user_role(현재 roles 하드코딩 제거·가입 시 USER 배정)·RoleChanged→클레임 갱신·회원 검색(blind index)/상세(마스킹)·강제 로그아웃 발행·잠금/해제(ADMIN_LOCKED)·AuditLog(WORM·전/후 값)·실효 회원상태 읽기모델.
+- [x] **8. 관리자 콘솔 + RBAC + 감사** — `app-admin` 신설·Role/Permission/user_role(현재 roles 하드코딩 제거·가입 시 USER 배정)·RoleChanged→클레임 갱신·회원 검색(blind index)/상세(마스킹)·강제 로그아웃 발행·잠금/해제(ADMIN_LOCKED)·AuditLog(WORM·전/후 값)·실효 회원상태 읽기모델. 완료 메모: RoleChanged 반영 수준은 재발급 시 반영(인증 `auth_account.roles` 투영 — 상한 Access TTL 15분, 즉시 차단은 강제 로그아웃 병행). 역할·권한 마스터는 마이그레이션 시딩, 관리자 계정 시딩은 SQL 불가(PII 봉투암호·Argon2가 앱 소유 키) — dev 프로비저닝+배정, 운영 최초 SUPER_ADMIN은 user_role INSERT 런북. in-process 이벤트가 앱 경계를 넘지 않아 RoleChanged·ForceLogoutRequested 소비는 app-admin에 배선(세션·전멸은 공유 Redis라 즉시 반영), 인증 이벤트 감사 append는 발행 앱(app-api)에 배선. JWT 키링이 인메모리·앱별이라 app-api 발급 토큰의 app-admin 검증은 9번(내구 공유 키스토어) 이후 성립. AuditLog 2년 후 PII crypto-shred 잡 연결은 후속(WORM 트리거 허용 범위 조정 포함).
 
 ## 하드닝·운영 게이트
 
