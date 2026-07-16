@@ -37,6 +37,9 @@ public class SecurityConfig {
                 // 프레임워크 sendError의 ERROR 디스패치가 /error에서 401로 둔갑하지 않게 허용(app-api와 동일).
                 .authorizeHttpRequests(auth -> auth.dispatcherTypeMatchers(DispatcherType.ERROR)
                         .permitAll()
+                        // 관리 엔드포인트는 분리된 관리 포트에만 매핑된다(내부망 전용 — app-api와 동일 방침).
+                        .requestMatchers("/actuator/**")
+                        .permitAll()
                         .requestMatchers("/admin/**")
                         .hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .anyRequest()

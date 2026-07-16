@@ -39,6 +39,26 @@ crypto:
     active-version: ${CRYPTO_BLIND_INDEX_ACTIVE_VERSION:1}
     peppers: ${CRYPTO_BLIND_INDEX_PEPPERS}
 
+# 관측성(지표·SLO 정의: docs/ops/observability-slo.md). 관리 엔드포인트는 서비스 포트와 분리해 내부망
+# 전용으로 둔다 — 보안 체인은 /actuator/**를 permitAll하고 격리는 네트워크(포트 비공개)가 소유한다.
+management:
+  server:
+    port: 9404
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      # 컨테이너 오케스트레이션 liveness/readiness 프로브 그룹 노출.
+      probes:
+        enabled: true
+  metrics:
+    distribution:
+      # URI별 지연 히스토그램 버킷 게시 — 로그인 p99 등 백분위는 스크레이퍼가 버킷으로 계산한다.
+      percentiles-histogram:
+        http.server.requests: true
+
 app:
   migration:
     # 이 앱이 영속하는 스키마(SchemaMigrationConfig가 스키마별 Flyway 실행). 스키마 추가 시 등록.

@@ -28,6 +28,9 @@ nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
 
 # spring / 영속 (버전은 BOM이 관리)
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
+# 관측성: Actuator(health probe·메트릭 엔드포인트) + Prometheus 레지스트리(버전은 BOM).
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
 spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc" }
 spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
