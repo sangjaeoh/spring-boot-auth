@@ -8,6 +8,7 @@ import com.example.auth.common.messaging.MessagePublisher;
 import com.example.auth.domain.auth.event.ConcurrentLimitExceeded;
 import com.example.auth.domain.auth.event.LastLoginObserved;
 import com.example.auth.domain.auth.event.RefreshReuseDetected;
+import com.example.auth.domain.auth.event.RefreshRotated;
 import com.example.auth.domain.auth.event.SessionRevoked;
 import com.example.auth.domain.auth.info.RotationOutcome;
 import com.example.auth.domain.auth.info.SessionCreated;
@@ -87,8 +88,9 @@ public class SessionProcessor {
     }
 
     /**
-     * 제시된 리프레시를 회전한다. 유예 재시도는 동일 토큰을 멱등 재반환하고, 유예 밖 재사용은 세션 패밀리를
-     * 무효화하며 {@link RefreshReuseDetected}를 발행한다.
+     * 제시된 리프레시를 회전하며 실 회전은 {@link RefreshRotated}를 발행한다. 유예 재시도는 동일 토큰을
+     * 멱등 재반환하고(발행 없음), 유예 밖 재사용은 세션 패밀리를 무효화하며 {@link RefreshReuseDetected}를
+     * 발행한다.
      */
     public RotationOutcome rotate(String presentedRefresh, Instant now) {
         String presentedJtiHash = tokenHasher.hash(presentedRefresh);
@@ -97,7 +99,13 @@ public class SessionProcessor {
         RotationResult result =
                 sessionStore.rotate(presentedJtiHash, newJtiHash, newRefreshPlain, now, graceWindow, sessionTtl);
         return switch (result.type()) {
-            case ROTATED, GRACE_REPLAY ->
+            case ROTATED -> {
+                UUID userId = requireNonNull(result.userId());
+                UUID sessionId = requireNonNull(result.sessionId());
+                messagePublisher.publish(new RefreshRotated(userId, sessionId, now));
+                yield RotationOutcome.rotated(userId, sessionId, requireNonNull(result.refreshPlain()));
+            }
+            case GRACE_REPLAY ->
                 RotationOutcome.rotated(
                         requireNonNull(result.userId()),
                         requireNonNull(result.sessionId()),
