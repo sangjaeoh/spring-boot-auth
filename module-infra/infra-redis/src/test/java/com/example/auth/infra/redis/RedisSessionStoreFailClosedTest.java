@@ -67,7 +67,11 @@ class RedisSessionStoreFailClosedTest {
         createScript.setLocation(new ClassPathResource("redis/create_session.lua"));
         createScript.setResultType(String.class);
 
-        store = new RedisSessionStore(template, rotateScript, createScript, 0, 250);
+        DefaultRedisScript<Long> revokeAllScript = new DefaultRedisScript<>();
+        revokeAllScript.setLocation(new ClassPathResource("redis/revoke_all_sessions.lua"));
+        revokeAllScript.setResultType(Long.class);
+
+        store = new RedisSessionStore(template, rotateScript, createScript, revokeAllScript, 0, 250);
     }
 
     @AfterEach

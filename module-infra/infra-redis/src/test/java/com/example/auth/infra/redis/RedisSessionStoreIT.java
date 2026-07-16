@@ -69,6 +69,10 @@ class RedisSessionStoreIT {
     @Qualifier("createSessionScript")
     private RedisScript<String> createScript;
 
+    @Autowired
+    @Qualifier("revokeAllSessionsScript")
+    private RedisScript<Long> revokeAllScript;
+
     @Test
     void createsValidatesAndRevokes() {
         UUID userId = UUID.randomUUID();
@@ -216,6 +220,27 @@ class RedisSessionStoreIT {
     }
 
     @Test
+    void revokesAllSessionsAtomicallyIncludingIndex() {
+        UUID userId = UUID.randomUUID();
+        Instant now = Instant.now();
+        UUID s1 = UUID.randomUUID();
+        UUID s2 = UUID.randomUUID();
+        UUID s3 = UUID.randomUUID();
+        create(userId, s1, UUID.randomUUID(), now, "jti-ra-1", "p1");
+        create(userId, s2, UUID.randomUUID(), now.plusMillis(1), "jti-ra-2", "p2");
+        create(userId, s3, UUID.randomUUID(), now.plusMillis(2), "jti-ra-3", "p3");
+
+        store.revokeAll(userId);
+
+        assertThat(store.validate(userId, s1, now)).isFalse();
+        assertThat(store.validate(userId, s2, now)).isFalse();
+        assertThat(store.validate(userId, s3, now)).isFalse();
+        // 세션 해시·인덱스가 한 Lua 안에서 함께 삭제된다(잔여 키 없음).
+        assertThat(template.hasKey(SessionKeys.indexKey(userId))).isFalse();
+        assertThat(template.hasKey(SessionKeys.sessionKey(userId, s1))).isFalse();
+    }
+
+    @Test
     void revokesSessionsBoundToDevice() {
         UUID userId = UUID.randomUUID();
         UUID targetDevice = UUID.randomUUID();
@@ -236,7 +261,8 @@ class RedisSessionStoreIT {
     void revokeFailsClosedWhenReplicaAcknowledgementFallsShort() {
         // 복제본 없는 단일 노드에서 min-replicas=1 → WAIT 확인 미달 → 503(fail-closed). prod Cluster의
         // failover 유실 차단 배선을 표준 Redis 의미론으로 검증한다.
-        RedisSessionStore durableStore = new RedisSessionStore(template, rotateScript, createScript, 1, 100);
+        RedisSessionStore durableStore =
+                new RedisSessionStore(template, rotateScript, createScript, revokeAllScript, 1, 100);
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
         create(userId, sessionId, UUID.randomUUID(), Instant.now(), "jti-w", "pw");
@@ -342,7 +368,8 @@ class RedisSessionStoreIT {
                 .doThrow(new RedisSystemException("injected", new RuntimeException()))
                 .when(spyValueOps)
                 .set(anyString(), anyString(), any(Duration.class));
-        RedisSessionStore failingRefIndexStore = new RedisSessionStore(spyTemplate, rotateScript, createScript, 0, 250);
+        RedisSessionStore failingRefIndexStore =
+                new RedisSessionStore(spyTemplate, rotateScript, createScript, revokeAllScript, 0, 250);
 
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
