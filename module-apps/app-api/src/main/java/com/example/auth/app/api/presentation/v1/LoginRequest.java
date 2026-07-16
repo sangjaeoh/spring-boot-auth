@@ -15,5 +15,6 @@ import jakarta.validation.constraints.Size;
 public record LoginRequest(
         @NotBlank @Size(max = 320) @Pattern(regexp = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", message = "이메일 형식이 올바르지 않습니다")
         String email,
+
         @NotBlank String password,
         @Valid @NotNull DeviceBindingRequest device) {}

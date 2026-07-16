@@ -82,7 +82,6 @@ class RedisChallengeStoreFailClosedTest {
 
     @Test
     void verifyFailsClosedWhenStoreUnreachable() {
-        assertThat(store.verify("challenge-1", "codehash").status())
-                .isEqualTo(VerificationResult.Status.NOT_FOUND);
+        assertThat(store.verify("challenge-1", "codehash").status()).isEqualTo(VerificationResult.Status.NOT_FOUND);
     }
 }

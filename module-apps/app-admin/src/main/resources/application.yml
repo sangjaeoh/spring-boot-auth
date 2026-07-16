@@ -37,7 +37,8 @@ crypto:
 app:
   migration:
     # 어드민이 접근하는 스키마(기동 검증용 — 운영 배포에서는 app-migration이 선행 실행된다).
-    schemas: auth,usr,msg,generic
+    # keyring(JWT 서명키 원장)을 app-api와 공유해 app-api 발급 토큰을 어드민이 검증한다.
+    schemas: auth,usr,msg,generic,keyring
 
 user:
   retention:

@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":module-domains:domain-generic"))
     implementation(project(":module-domains:domain-user"))
     implementation(project(":module-infra:infra-crypto"))
+    implementation(project(":module-infra:infra-keystore"))
     implementation(project(":module-infra:infra-messaging"))
     implementation(project(":module-infra:infra-redis"))
     implementation(project(":module-external:external-geoip"))

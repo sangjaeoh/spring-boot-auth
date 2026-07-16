@@ -39,8 +39,8 @@ crypto:
 app:
   migration:
     # 이 앱이 영속하는 스키마(SchemaMigrationConfig가 스키마별 Flyway 실행). 스키마 추가 시 등록.
-    # msg는 infra-messaging 소유(디둡·DLQ) — 도메인 스키마가 아닌 메시징 기술 스키마다.
-    schemas: auth,usr,msg,generic
+    # msg는 infra-messaging 소유(디둡·DLQ), keyring은 infra-keystore 소유(JWT 서명키 원장) — 기술 스키마다.
+    schemas: auth,usr,msg,generic,keyring
 
 generic:
   notification:
@@ -90,6 +90,9 @@ auth:
     jwks:
       # 유예 창 ≥ 2×Access TTL(15분). 회전된 키를 이 기간 검증·게시한 뒤 축출한다.
       grace-minutes: 30
+      # 서명키 자동 회전 주기(ISO-8601 — Spring @Scheduled는 "90d"를 못 읽는다). 회전 판정 주기
+      # (rotation-check-interval)·스토어 재적재 주기(refresh-interval)는 기본값 PT1H·PT1M을 쓴다.
+      rotation-period: P90D
   password:
     hashing:
       # 동시 Argon2 실행 상한(0=auto=가용 코어수). peak Argon2 힙 ≈ max-concurrent × argon2.memory-kb(≈코어×19MB).
