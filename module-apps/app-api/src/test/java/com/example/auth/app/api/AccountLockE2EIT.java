@@ -7,8 +7,10 @@ import com.example.auth.app.api.presentation.v1.DeviceBindingRequestFixture;
 import com.example.auth.app.api.presentation.v1.LoginRequest;
 import com.example.auth.domain.auth.entity.LockState;
 import com.example.auth.domain.auth.repository.AuthAccountRepository;
+import com.example.auth.domain.auth.service.AccountLockProcessor;
 import com.example.auth.domain.generic.entity.NotificationChannel;
 import com.example.auth.external.notification.MockNotificationSender;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +61,9 @@ class AccountLockE2EIT {
     private AuthAccountRepository authAccountRepository;
 
     @Autowired
+    private AccountLockProcessor accountLockProcessor;
+
+    @Autowired
     private MockNotificationSender notificationSender;
 
     @Test
@@ -80,6 +85,27 @@ class AccountLockE2EIT {
         });
 
         Thread.sleep(1_500);
+
+        assertThat(login(email, "secret123").getStatusCode().value()).isEqualTo(200);
+        assertThat(authAccountRepository.findById(userId).orElseThrow().getLockState())
+                .isEqualTo(LockState.NONE);
+    }
+
+    @Test
+    void adminLockRejectsLoginUntilAdminUnlock() throws Exception {
+        String email = "admin-lock@example.com";
+        UUID userId = provisioning.provision(email, "secret123");
+
+        accountLockProcessor.lockByAdmin(userId, Instant.now());
+
+        // 올바른 자격증명도 사유 미구분 401(ADMIN_LOCKED 로그인 거부).
+        assertThat(login(email, "secret123").getStatusCode().value()).isEqualTo(401);
+
+        // 쿨다운(이 IT 설정 1초)이 지나도 관리자 잠금은 자동 해제되지 않는다.
+        Thread.sleep(1_500);
+        assertThat(login(email, "secret123").getStatusCode().value()).isEqualTo(401);
+
+        accountLockProcessor.unlockByAdmin(userId, Instant.now());
 
         assertThat(login(email, "secret123").getStatusCode().value()).isEqualTo(200);
         assertThat(authAccountRepository.findById(userId).orElseThrow().getLockState())

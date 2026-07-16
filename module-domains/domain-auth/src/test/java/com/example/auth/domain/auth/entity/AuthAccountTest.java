@@ -3,6 +3,8 @@ package com.example.auth.domain.auth.entity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.auth.domain.auth.exception.AuthErrorCode;
+import com.example.auth.domain.auth.exception.AuthException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -68,6 +70,51 @@ class AuthAccountTest {
     @Test
     void unlockedAccountIsNeverExpired() {
         assertThat(account().isTemporaryLockExpired(NOW, COOLDOWN)).isFalse();
+    }
+
+    @Test
+    void locksByAdminFromNoneAndReleasesByAdmin() {
+        AuthAccount account = account();
+
+        account.lockByAdmin(NOW);
+
+        assertThat(account.getLockState()).isEqualTo(LockState.ADMIN_LOCKED);
+        assertThat(account.getLockReason()).isEqualTo(LockReason.ADMIN_ACTION);
+        assertThat(account.isLoginAllowed()).isFalse();
+        // 관리자 잠금은 쿨다운 자동 해제 대상이 아니다.
+        assertThat(account.isTemporaryLockExpired(NOW.plus(COOLDOWN), COOLDOWN)).isFalse();
+
+        account.releaseLockByAdmin();
+
+        assertThat(account.getLockState()).isEqualTo(LockState.NONE);
+        assertThat(account.getLockReason()).isNull();
+        assertThat(account.getLockedAt()).isNull();
+    }
+
+    @Test
+    void adminReleaseAlsoClearsTemporaryLock() {
+        AuthAccount account = account();
+        account.lockTemporarily(LockReason.CONSECUTIVE_LOGIN_FAILURE, NOW);
+
+        account.releaseLockByAdmin();
+
+        assertThat(account.getLockState()).isEqualTo(LockState.NONE);
+    }
+
+    @Test
+    void rejectsAdminLockWhenAlreadyLockedAndReleaseWhenNotLocked() {
+        AuthAccount locked = account();
+        locked.lockTemporarily(LockReason.CONSECUTIVE_LOGIN_FAILURE, NOW);
+        assertThatThrownBy(() -> locked.lockByAdmin(NOW))
+                .isInstanceOf(AuthException.class)
+                .satisfies(e ->
+                        assertThat(((AuthException) e).getErrorCode()).isEqualTo(AuthErrorCode.ACCOUNT_ALREADY_LOCKED));
+
+        AuthAccount unlocked = account();
+        assertThatThrownBy(unlocked::releaseLockByAdmin)
+                .isInstanceOf(AuthException.class)
+                .satisfies(e ->
+                        assertThat(((AuthException) e).getErrorCode()).isEqualTo(AuthErrorCode.ACCOUNT_NOT_LOCKED));
     }
 
     @Test

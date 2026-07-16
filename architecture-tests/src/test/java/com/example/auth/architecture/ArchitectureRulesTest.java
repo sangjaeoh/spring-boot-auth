@@ -25,23 +25,31 @@ class ArchitectureRulesTest {
             .resideInAPackage("..entity..")
             .as("JPA 엔티티는 도메인 entity 패키지에만 둔다");
 
+    // admin 격리 구역(infrastructure/query)만 엔티티·리포지토리 접근을 허용한다(docs/architecture.md —
+    // 앱 모듈 구조·경계 원칙의 예외 격리 구역). batch reader 구역은 크로스 스키마 읽기가 생길 때 연다.
+    private static final String ADMIN_QUERY_ZONE = "..app.admin.infrastructure.query..";
+
     @ArchTest
     static final ArchRule apps_do_not_depend_on_entities = noClasses()
             .that()
             .resideInAPackage("..app..")
+            .and()
+            .resideOutsideOfPackage(ADMIN_QUERY_ZONE)
             .should()
             .dependOnClassesThat()
             .areAnnotatedWith("jakarta.persistence.Entity")
-            .as("앱은 엔티티에 의존하지 않는다(경계는 Info)");
+            .as("앱은 엔티티에 의존하지 않는다(경계는 Info — admin 격리 구역 제외)");
 
     @ArchTest
     static final ArchRule apps_do_not_access_repositories = noClasses()
             .that()
             .resideInAPackage("..app..")
+            .and()
+            .resideOutsideOfPackage(ADMIN_QUERY_ZONE)
             .should()
             .dependOnClassesThat()
             .areAssignableTo("org.springframework.data.repository.Repository")
-            .as("앱은 리포지토리에 직접 접근하지 않는다");
+            .as("앱은 리포지토리에 직접 접근하지 않는다(admin 격리 구역 제외)");
 
     @ArchTest
     static final ArchRule module_base_packages_are_null_marked = classes()

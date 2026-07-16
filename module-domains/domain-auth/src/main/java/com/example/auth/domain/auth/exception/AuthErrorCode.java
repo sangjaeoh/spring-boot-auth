@@ -31,6 +31,8 @@ public enum AuthErrorCode implements ErrorCode {
     SESSION_NOT_FOUND("AUTH_SESSION_NOT_FOUND", "세션을 찾을 수 없습니다.", 404),
     SESSION_STORE_UNAVAILABLE("AUTH_SESSION_STORE_UNAVAILABLE", "일시적으로 세션 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.", 503),
     ACCOUNT_NOT_FOUND("AUTH_ACCOUNT_NOT_FOUND", "인증 계정을 찾을 수 없습니다.", 404),
+    ACCOUNT_ALREADY_LOCKED("AUTH_ACCOUNT_ALREADY_LOCKED", "이미 잠긴 계정입니다.", 409),
+    ACCOUNT_NOT_LOCKED("AUTH_ACCOUNT_NOT_LOCKED", "잠기지 않은 계정입니다.", 409),
     ACCOUNT_DORMANT("AUTH_ACCOUNT_DORMANT", "휴면 계정입니다. 본인 확인 후 휴면을 해제해 주세요.", 403),
     RATE_LIMITED("AUTH_RATE_LIMITED", "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.", 429);
 

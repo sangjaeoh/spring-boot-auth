@@ -25,5 +25,6 @@ dependencies {
     testImplementation(project(":module-external:external-notification"))
     testImplementation(project(":module-external:external-social"))
     testImplementation(project(":module-apps:app-api"))
+    testImplementation(project(":module-apps:app-admin"))
     testImplementation(project(":module-apps:app-migration"))
 }
