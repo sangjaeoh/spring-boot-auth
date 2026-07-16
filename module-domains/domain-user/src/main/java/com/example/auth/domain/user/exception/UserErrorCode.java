@@ -17,6 +17,9 @@ public enum UserErrorCode implements ErrorCode {
     SECURITY_CHANNEL_REQUIRED("USER_SECURITY_CHANNEL_REQUIRED", "보안 알림은 이메일·SMS 중 최소 한 채널을 유지해야 합니다.", 400),
     NOTIFICATION_PREFERENCE_NOT_FOUND("USER_NOTIFICATION_PREFERENCE_NOT_FOUND", "알림 수신 설정이 존재하지 않습니다.", 404),
     USER_NOT_FOUND("USER_NOT_FOUND", "회원이 존재하지 않습니다.", 404),
+    ROLE_NOT_FOUND("USER_ROLE_NOT_FOUND", "역할이 존재하지 않습니다.", 404),
+    ROLE_ALREADY_ASSIGNED("USER_ROLE_ALREADY_ASSIGNED", "이미 배정된 역할입니다.", 409),
+    ROLE_NOT_ASSIGNED("USER_ROLE_NOT_ASSIGNED", "배정되지 않은 역할입니다.", 404),
     USER_ALREADY_WITHDRAWN("USER_ALREADY_WITHDRAWN", "이미 탈퇴한 회원입니다.", 409),
     INVALID_STATUS_TRANSITION("USER_INVALID_STATUS_TRANSITION", "회원 상태 전이가 올바르지 않습니다.", 409),
     REJOIN_COOLDOWN("USER_REJOIN_COOLDOWN", "탈퇴 후 재가입 제한 기간입니다.", 409);

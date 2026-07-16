@@ -9,6 +9,7 @@ import com.example.auth.domain.auth.exception.AuthErrorCode;
 import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.repository.AuthAccountRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +50,20 @@ public class AuthAccountModifier {
         }
         account.changeLoginEmail(email);
         messagePublisher.publish(new LoginEmailChanged(userId, Instant.now()));
+    }
+
+    /**
+     * 유저 역할 배정 스냅샷을 반영한다 — {@code occurredAt} 단조 기준 멱등이며 역순·중복 이벤트는
+     * 무시된다. 계정 미존재도 무시한다(at-least-once 재전달의 안전 흡수).
+     */
+    @Transactional
+    public void applyRoles(UUID userId, List<String> roles, Instant occurredAt) {
+        AuthAccount account = repository.findById(userId).orElse(null);
+        if (account == null) {
+            log.warn("역할 투영 반영 대상 계정 없음 userId={} roles={}", userId, roles);
+            return;
+        }
+        account.applyRoles(roles, occurredAt);
     }
 
     /**
