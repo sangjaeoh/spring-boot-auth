@@ -1,0 +1,8 @@
+# 이미지 빌드 컨텍스트 제외 — 시크릿·산출물·로컬 상태는 컨텍스트에 넣지 않는다.
+.git
+.gradle
+**/build
+.idea
+.vscode
+.dev-secrets.env
+*.log

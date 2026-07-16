@@ -1,0 +1,32 @@
+# CD 최소안: 버전 태그(v*) 푸시 시 4개 앱 이미지를 빌드해 GHCR에 게시한다.
+# 품질 게이트 CI(빌드·테스트)는 별도 워크플로 소유(todo 1번) — 태그는 게이트 통과 커밋에만 붙인다는 규약.
+# 배포(롤아웃 순서·카나리)는 docs/ops/deployment.md 규약을 따른다.
+name: release-images
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [app-api, app-admin, app-batch, app-migration]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          build-args: APP=${{ matrix.app }}
+          push: true
+          tags: ghcr.io/${{ github.repository }}/${{ matrix.app }}:${{ github.ref_name }}
