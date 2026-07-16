@@ -25,14 +25,15 @@ server:
   # app-api(8080)와 분리 기동한다(어드민은 내부망 노출 전제).
   port: 8081
 
-# PII 봉투 암호화·blind index 키(dev 정적 — app-api와 동일 키). prod는 시크릿 매니저 주입.
+# PII 봉투 암호화 KEK·blind index pepper(app-api와 동일 시크릿 주입 — 같은 데이터를 복호·조회한다).
+# 키 원문은 레포에 두지 않는다. 주입 계약·로컬 부트스트랩은 app-api application.yml 주석과 동일.
 crypto:
   envelope:
-    active-version: 1
-    keys: "1:vO5tqt9e8TOJ/R/qBbltt+FHyWJdL0khopfmCTfTxFo="
+    active-version: ${CRYPTO_ENVELOPE_ACTIVE_VERSION:1}
+    keys: ${CRYPTO_ENVELOPE_KEYS}
   blind-index:
-    active-version: 1
-    peppers: "1:RqbTfuuNIU/NaYFmNMpGwU7jj0e+9YXIOytVeqnh4Ms="
+    active-version: ${CRYPTO_BLIND_INDEX_ACTIVE_VERSION:1}
+    peppers: ${CRYPTO_BLIND_INDEX_PEPPERS}
 
 app:
   migration:

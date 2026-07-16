@@ -25,16 +25,19 @@ spring:
       # 연결 수립 stall 상한. 재연결 중 명령 큐잉 거부(REJECT_COMMANDS)와 함께 RedisClientConfig가 조립한다.
       connect-timeout: 250ms
 
-# PII 봉투 암호화·blind index 키(dev 정적). prod는 시크릿 매니저 주입 + 분리 보관(pepper 유출 시 blind index
-# 역추론 가능). keys/peppers는 "version:base64[,version:base64]" — 회전 시 새 버전 추가 + active-version 상향
-# (구 암호문은 동봉 버전으로 복호되어 전 행 재암호화 불요).
+# PII 봉투 암호화 KEK(JWT 서명키 keyring 봉투암호 겸용)·blind index pepper. 키 원문은 레포에 두지 않는다 —
+# 시크릿 매니저가 환경변수로 주입하고(주입 계약: docs/ops/deployment.md), 미주입 기동은 placeholder 미해결로
+# fail-fast한다. 로컬은 scripts/generate-dev-secrets.sh가 만든 .dev-secrets.env를 source한다.
+# keys/peppers는 "version:base64[,version:base64]" — 회전 시 새 버전 추가 + active-version 상향
+# (구 암호문은 동봉 버전으로 복호되어 전 행 재암호화 불요). KEK와 pepper는 분리 보관한다(pepper 유출 시
+# blind index 역추론 가능).
 crypto:
   envelope:
-    active-version: 1
-    keys: "1:vO5tqt9e8TOJ/R/qBbltt+FHyWJdL0khopfmCTfTxFo="
+    active-version: ${CRYPTO_ENVELOPE_ACTIVE_VERSION:1}
+    keys: ${CRYPTO_ENVELOPE_KEYS}
   blind-index:
-    active-version: 1
-    peppers: "1:RqbTfuuNIU/NaYFmNMpGwU7jj0e+9YXIOytVeqnh4Ms="
+    active-version: ${CRYPTO_BLIND_INDEX_ACTIVE_VERSION:1}
+    peppers: ${CRYPTO_BLIND_INDEX_PEPPERS}
 
 app:
   migration:
