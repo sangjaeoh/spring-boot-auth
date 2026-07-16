@@ -13,7 +13,7 @@ jspecify = "1.0.0"
 archunit = "1.4.2"
 # BouncyCastle는 Argon2PasswordEncoder의 런타임 필수이나 spring-security-crypto의 optional 의존이라
 # 전이되지 않고 Spring Boot BOM도 관리하지 않는다 → 여기서 명시 pin(code-quality.md: 버전 리터럴 금지).
-bouncycastle = "1.78.1"
+bouncycastle = "1.85"
 # springdoc 3.x가 Spring Boot 4 대응 라인이다(2.x는 Boot 3 전용).
 springdoc = "3.0.3"
 
