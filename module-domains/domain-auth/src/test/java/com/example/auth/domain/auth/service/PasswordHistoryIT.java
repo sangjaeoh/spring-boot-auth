@@ -12,7 +12,9 @@ import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.repository.PasswordCredentialRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,6 +23,8 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -35,15 +39,20 @@ class PasswordHistoryIT {
 
     private static final int HISTORY_LIMIT = 3;
 
+    // KDF 호출 시점의 트랜잭션 활성 여부 기록 — 변경·재설정의 KDF가 커넥션 점유 없이(tx 밖) 돌았음을 판별.
+    private static final List<Boolean> KDF_TX_ACTIVITY = new CopyOnWriteArrayList<>();
+
     // 결정적·고속 대조용 fake KDF(실 Argon2 경로는 app-api E2E가 커버). "enc:" 접두 인코딩.
     private static final PasswordHasher FAKE_HASHER = new PasswordHasher() {
         @Override
         public String hash(String rawPassword) {
+            KDF_TX_ACTIVITY.add(TransactionSynchronizationManager.isActualTransactionActive());
             return "enc:" + rawPassword;
         }
 
         @Override
         public boolean matches(String rawPassword, String encodedHash) {
+            KDF_TX_ACTIVITY.add(TransactionSynchronizationManager.isActualTransactionActive());
             return encodedHash.equals("enc:" + rawPassword);
         }
 
@@ -90,14 +99,39 @@ class PasswordHistoryIT {
         modifier.change(userId, "password4", "password0", t0.plus(Duration.ofSeconds(6)));
     }
 
+    @Test
+    void runsKdfOutsideTransactionWhileChangeAndResetStillApplyAtomically() {
+        UUID userId = UUID.randomUUID();
+        Instant t0 = Instant.now();
+        repository.save(PasswordCredential.create(userId, FAKE_HASHER.hash("password0"), HashAlgorithm.ARGON2ID, t0));
+        KDF_TX_ACTIVITY.clear();
+
+        modifier.change(userId, "password0", "password1", t0.plus(Duration.ofSeconds(1)));
+        modifier.resetTo(userId, "password2", t0.plus(Duration.ofSeconds(2)));
+
+        // KDF(현재 대조·재사용 대조·신규 인코딩)가 전부 트랜잭션 밖에서 실행됐다(커넥션 비점유).
+        assertThat(KDF_TX_ACTIVITY).isNotEmpty().containsOnly(false);
+
+        // 변경·재설정 결과는 정상 커밋됐다(재설정 후 해시 반영 + 직전 비번 재사용 거부).
+        assertThat(repository.findById(userId).orElseThrow().getPasswordHash()).isEqualTo(FAKE_HASHER.hash("password2"));
+        assertThatThrownBy(() -> modifier.resetTo(userId, "password1", t0.plus(Duration.ofSeconds(3))))
+                .isInstanceOf(AuthException.class);
+    }
+
     @TestConfiguration
     static class TestBeans {
 
         @Bean
-        PasswordCredentialModifier passwordCredentialModifier(PasswordCredentialRepository repository) {
+        PasswordCredentialModifier passwordCredentialModifier(
+                PasswordCredentialRepository repository, PlatformTransactionManager transactionManager) {
             MessagePublisher noopPublisher = event -> {};
             return new PasswordCredentialModifier(
-                    repository, FAKE_HASHER, new PasswordPolicyValidator(8), noopPublisher, HISTORY_LIMIT);
+                    repository,
+                    FAKE_HASHER,
+                    new PasswordPolicyValidator(8),
+                    noopPublisher,
+                    transactionManager,
+                    HISTORY_LIMIT);
         }
     }
 }
