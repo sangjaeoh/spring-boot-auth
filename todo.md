@@ -34,5 +34,5 @@
 
 ## 하드닝·운영 게이트
 
-- [ ] **9. 이연 하드닝(1a·1b)** — JWKS 자동 90일 회전 + 내구 키스토어 + 다중 인스턴스 공유(현재 인메모리·단일 인스턴스 한정·재시작 시 직전 Access 401), revokeAll 단일 Lua 원자화, Lettuce 연결단 타임아웃, change/resetTo KDF를 tx 밖으로, 챌린지 발급 Redis 장애 503 정합, 로그인 DTO @Email 간극.
+- [x] **9. 이연 하드닝(1a·1b)** — JWKS 자동 90일 회전 + 내구 키스토어 + 다중 인스턴스 공유(현재 인메모리·단일 인스턴스 한정·재시작 시 직전 Access 401), revokeAll 단일 Lua 원자화, Lettuce 연결단 타임아웃, change/resetTo KDF를 tx 밖으로, 챌린지 발급 Redis 장애 503 정합, 로그인 DTO @Email 간극. 완료 메모: 키스토어는 공유 PostgreSQL `keyring` 스키마(`infra-keystore` 신설, 개인키 JWK는 기존 EnvelopeCipher 봉투암호 — 신규 인프라 없음), 회전·부트스트랩은 어드바이저리 잠금 CAS로 직렬화, 미지 kid는 디코더 재적재로 즉시 수용(주기 재적재 PT1M·회전 판정 PT1H·주기 P90D). app-api 발급 토큰의 app-admin 검증이 이로써 성립(8번 이연 해소). Argon2 VT 전용 실행기는 조건(VT 활성 계획) 미충족으로 미변경, 서명키 KEK의 prod 시크릿 매니저 주입은 10번 소유. revokeAllExcept·revokeByDevice는 명시 범위 밖이라 루프 유지(WAIT 내구 확인은 기존대로 적용).
 - [ ] **10. 운영·보안 게이트(prod 배포 전 비협상)** — 부하테스트(핫패스 p99·Lua 경합·Argon2 메모리 예산)·관측성/SLO·컨테이너화/CD(app-migration init·expand-contract)·시크릿 관리(pepper·KEK·서명키·.p8 — 현재 dev 정적 키 평문)·DR/HA(백업/PITR·RTO/RPO·런북)·보안 테스트(STRIDE·펜테스트·SCA·열거 저항)·컴플라이언스(법무·PIA)·OpenAPI 계약.
