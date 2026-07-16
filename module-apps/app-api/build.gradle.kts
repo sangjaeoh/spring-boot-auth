@@ -41,3 +41,8 @@ dependencies {
     // implementation 의존이라 app-api 테스트 컴파일 클래스패스에 전이되지 않으므로 명시).
     testImplementation(libs.spring.security.oauth2.jose)
 }
+
+tasks.test {
+    // 부하 프로파일 옵트인 전달 — 기본 빌드는 LoadProfileIT를 스킵한다(docs/ops/load-report.md).
+    systemProperty("loadProfile", System.getProperty("loadProfile", "false"))
+}
