@@ -14,6 +14,8 @@ archunit = "1.4.2"
 # BouncyCastle는 Argon2PasswordEncoder의 런타임 필수이나 spring-security-crypto의 optional 의존이라
 # 전이되지 않고 Spring Boot BOM도 관리하지 않는다 → 여기서 명시 pin(code-quality.md: 버전 리터럴 금지).
 bouncycastle = "1.78.1"
+# springdoc 3.x가 Spring Boot 4 대응 라인이다(2.x는 Boot 3 전용).
+springdoc = "3.0.3"
 
 [libraries]
 # BOM (Gradle 네이티브 platform로 임포트)
@@ -31,6 +33,8 @@ spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" 
 # 관측성: Actuator(health probe·메트릭 엔드포인트) + Prometheus 레지스트리(버전은 BOM).
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
+# OpenAPI 계약 게시(스펙 엔드포인트 전용 — Swagger UI 미포함 최소안).
+springdoc-openapi-starter-webmvc-api = { module = "org.springdoc:springdoc-openapi-starter-webmvc-api", version.ref = "springdoc" }
 spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc" }
 spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }

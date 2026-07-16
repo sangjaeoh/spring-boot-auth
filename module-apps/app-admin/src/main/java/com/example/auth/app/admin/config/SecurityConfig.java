@@ -40,6 +40,9 @@ public class SecurityConfig {
                         // 관리 엔드포인트는 분리된 관리 포트에만 매핑된다(내부망 전용 — app-api와 동일 방침).
                         .requestMatchers("/actuator/**")
                         .permitAll()
+                        // OpenAPI 계약(어드민 앱 자체가 내부망 노출 전제).
+                        .requestMatchers("/v3/api-docs/**")
+                        .permitAll()
                         .requestMatchers("/admin/**")
                         .hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .anyRequest()
