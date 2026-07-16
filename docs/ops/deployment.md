@@ -10,7 +10,7 @@
 
 - 이미지는 루트 `Dockerfile` 하나가 4개 앱을 빌드한다(`--build-arg APP=app-{name}`). 빌드는 컨테이너 안 래퍼 빌드로 재현 가능하고, 테스트는 CI 게이트가 소유한다(이미지 빌드는 bootJar만).
 - 게시는 `.github/workflows/release-images.yml`이 버전 태그(v*)에서 GHCR로 푸시한다. 태그는 품질 게이트 통과 커밋에만 붙인다.
-- 롤아웃 순서: `app-migration`을 init 컨테이너(또는 선행 잡)로 실행해 성공 종료를 확인한 뒤 앱을 교체한다. 로컬 재현은 `docker-compose.stack.yml`(`service_completed_successfully` 배선).
+- 롤아웃 순서: `app-migration`을 init 컨테이너(또는 선행 잡)로 실행해 성공 종료를 확인한 뒤 앱을 교체한다. 로컬 재현은 `docker-compose.yml`(`service_completed_successfully` 배선).
 - 프로브: liveness `/actuator/health/liveness`, readiness `/actuator/health/readiness`(관리 포트 — [observability-slo](observability-slo.md)). 관리 포트는 외부에 게시하지 않는다.
 - 앱은 무상태(세션·잠금 카운터는 공유 Redis, 서명키는 공유 `keyring` 스키마)라 인스턴스 수평 확장·구버전 병행이 안전하다 — 카나리는 트래픽 일부를 신버전 인스턴스로 보내고 [observability-slo](observability-slo.md)의 알람 기준(5xx·p99·실패율)으로 승격/롤백을 판정한다.
 - Mock↔실 어댑터 피처플래그(`auth.social.mode`·`user.identity-verification.mode`·`generic.notification.mode`)는 인스턴스 설정 단위로 적용되므로 카나리 인스턴스에만 실모드를 켜 점진 전환할 수 있다(미주입 기동 fail-fast).

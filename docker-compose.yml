@@ -1,4 +1,9 @@
-# 로컬 개발용 인프라. 테스트는 Testcontainers가 자체 컨테이너를 띄우므로 이 compose와 무관하다.
+# 단일 로컬 스택 — git clone 후 `docker compose up --build`만으로 전체 앱을 띄운다.
+# app-migration을 init 컨테이너로 선행 실행(스키마별 Flyway 전량 적용·성공 종료)한 뒤 api·admin을 올린다.
+# 배포 순서 계약(service_completed_successfully)의 로컬 재현이다(정본: docs/ops/deployment.md).
+#
+# 앱 없이 인프라만 필요할 때(IDE에서 Gradle로 앱을 직접 실행): docker compose up -d postgres redis --wait
+# 테스트는 Testcontainers가 자체 컨테이너를 띄우므로 이 compose와 무관하다.
 services:
   postgres:
     image: postgres:17-alpine
@@ -25,6 +30,58 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # init 컨테이너: 스키마별 Flyway를 전부 적용하고 성공 종료(exit 0)해야 앱 롤아웃이 시작된다.
+  migration:
+    build:
+      context: .
+      args:
+        APP: app-migration
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth
+
+  api:
+    build:
+      context: .
+      args:
+        APP: app-api
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth
+      SPRING_DATA_REDIS_HOST: redis
+      # dev 전용 고정 키(throwaway) — POSTGRES_PASSWORD와 같은 성격의 로컬 개발값이다. prod는 시크릿 매니저가
+      # 같은 변수명으로 주입한다(docs/ops/deployment.md). 셸에 `source .dev-secrets.env`로 실 키를 넣으면
+      # compose가 그 값을 대신 쓴다(미주입 시 아래 기본값). 이 키로 암호화된 데이터는 로컬 볼륨 한정이다.
+      CRYPTO_ENVELOPE_KEYS: "${CRYPTO_ENVELOPE_KEYS:-1:ZGV2LWVudmVsb3BlLWtlay10aHJvd2F3YXktZG8tbm8=}"
+      CRYPTO_BLIND_INDEX_PEPPERS: "${CRYPTO_BLIND_INDEX_PEPPERS:-1:ZGV2LWJsaW5kaW5kZXgtcGVwcGVyLXRocm93YXdheTA=}"
+    ports:
+      - "8080:8080"
+
+  admin:
+    build:
+      context: .
+      args:
+        APP: app-admin
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth
+      SPRING_DATA_REDIS_HOST: redis
+      CRYPTO_ENVELOPE_KEYS: "${CRYPTO_ENVELOPE_KEYS:-1:ZGV2LWVudmVsb3BlLWtlay10aHJvd2F3YXktZG8tbm8=}"
+      CRYPTO_BLIND_INDEX_PEPPERS: "${CRYPTO_BLIND_INDEX_PEPPERS:-1:ZGV2LWJsaW5kaW5kZXgtcGVwcGVyLXRocm93YXdheTA=}"
+    ports:
+      - "8081:8081"
 
 volumes:
   pgdata:
