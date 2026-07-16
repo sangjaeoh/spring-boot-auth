@@ -38,6 +38,9 @@ public class SecurityConfig {
                         // management 블록). 체인은 permitAll하고 격리는 네트워크가 소유한다.
                         .requestMatchers("/actuator/**")
                         .permitAll()
+                        // OpenAPI 계약(공개 스펙 — 비밀 아님·공개 라우트는 어차피 열거 가능).
+                        .requestMatchers("/v3/api-docs/**")
+                        .permitAll()
                         .requestMatchers(
                                 "/.well-known/jwks.json",
                                 "/auth/login",
