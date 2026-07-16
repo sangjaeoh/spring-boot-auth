@@ -14,7 +14,7 @@
 
 ## 게이트·코어 완성 (요구사항 Phase 1 마감)
 
-- [ ] **1. CI 파이프라인** — `.github` 부재로 품질 게이트(Spotless·NullAway·Error Prone·ArchUnit·Testcontainers 테스트)가 로컬 `./gradlew build`에만 존재. GitHub Actions push/PR 게이트 강제.
+- [x] **1. CI 파이프라인** — `.github` 부재로 품질 게이트(Spotless·NullAway·Error Prone·ArchUnit·Testcontainers 테스트)가 로컬 `./gradlew build`에만 존재. GitHub Actions push/PR 게이트 강제. 완료 메모: `.github/workflows/build.yml` — push(main)·pull_request 트리거 → setup-java(temurin 25) → 공식 setup-gradle 캐시 → `./gradlew build`. Testcontainers(Postgres·Redis)는 러너 내장 Docker로 직접 기동(서비스 선언 불필요). 병합 차단(branch protection)은 리포 설정이라 코드 밖 — 필수 상태체크(`build`) 등록 권장은 PR 설명에 기재.
 - [x] **2. 가입 완료 — CreateUser 단일 크로스스키마 트랜잭션** — 온보딩 `complete()`와 시드 전용 프로비저닝 파사드만 있고 정회원 커밋 라우트가 없다. usr(User·ConsentRecord append·CiRegistry.link 유니크 hard-enforce·IdentityVerification 연결) + auth(AuthAccount·PasswordCredential)를 한 ACID 트랜잭션으로 원자 생성. **이 항목 완료 = 요구사항 Phase 1(코어 로컬 인증 MVP) 완성**
 
 ## 인증 수단·세션 통제 (Phase 2·3)
