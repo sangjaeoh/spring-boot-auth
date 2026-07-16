@@ -27,9 +27,11 @@ import com.example.auth.domain.user.repository.ConsentRecordRepository;
 import com.example.auth.domain.user.repository.ConsentStateRepository;
 import com.example.auth.domain.user.repository.IdentityVerificationRepository;
 import com.example.auth.domain.user.repository.NotificationPreferenceRepository;
+import com.example.auth.domain.user.repository.RoleRepository;
 import com.example.auth.domain.user.repository.TermsDocumentRepository;
 import com.example.auth.domain.user.repository.TermsVersionRepository;
 import com.example.auth.domain.user.repository.UserRepository;
+import com.example.auth.domain.user.repository.UserRoleRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -276,6 +278,11 @@ class WithdrawalAndRejoinIT {
         }
 
         @Bean
+        UserRoleAppender userRoleAppender(RoleRepository roleRepository, UserRoleRepository userRoleRepository) {
+            return new UserRoleAppender(roleRepository, userRoleRepository);
+        }
+
+        @Bean
         UserRegistrationProcessor userRegistrationProcessor(
                 IdentityVerificationRepository identityVerificationRepository,
                 ConsentValidator consentValidator,
@@ -283,6 +290,7 @@ class WithdrawalAndRejoinIT {
                 UserAppender userAppender,
                 ConsentAppender consentAppender,
                 NotificationPreferenceAppender notificationPreferenceAppender,
+                UserRoleAppender userRoleAppender,
                 CiRegistryRepository ciRegistryRepository) {
             return new UserRegistrationProcessor(
                     identityVerificationRepository,
@@ -291,6 +299,7 @@ class WithdrawalAndRejoinIT {
                     userAppender,
                     consentAppender,
                     notificationPreferenceAppender,
+                    userRoleAppender,
                     ciRegistryRepository);
         }
 

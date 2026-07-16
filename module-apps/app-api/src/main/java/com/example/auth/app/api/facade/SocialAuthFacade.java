@@ -54,8 +54,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class SocialAuthFacade {
 
-    private static final List<String> DEFAULT_ROLES = List.of("USER");
-
     private final SocialConnectionProcessor socialConnectionProcessor;
     private final RegistrationSessionProcessor registrationSessionProcessor;
     private final AccountRegistrationProcessor accountRegistrationProcessor;
@@ -196,7 +194,8 @@ public class SocialAuthFacade {
                 risk.countryCode(),
                 now);
         messagePublisher.publish(new LoggedIn(userId, session.sessionId(), now));
-        String accessToken = jwtIssuer.issueAccess(userId, session.sessionId(), DEFAULT_ROLES, accessTtl, now);
+        List<String> roles = authAccountReader.getRoles(userId);
+        String accessToken = jwtIssuer.issueAccess(userId, session.sessionId(), roles, accessTtl, now);
         return new TokenResponse(accessToken, session.refreshToken(), accessTtl.toSeconds());
     }
 

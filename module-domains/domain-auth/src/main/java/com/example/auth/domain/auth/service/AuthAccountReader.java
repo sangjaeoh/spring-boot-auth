@@ -6,6 +6,7 @@ import com.example.auth.domain.auth.exception.AuthErrorCode;
 import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.info.LoginAccountInfo;
 import com.example.auth.domain.auth.repository.AuthAccountRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,19 @@ public class AuthAccountReader {
     @Transactional(readOnly = true)
     public Optional<LoginAccountInfo> findForLogin(UUID userId) {
         return repository.findById(userId).map(LoginAccountInfo::from);
+    }
+
+    /**
+     * 토큰 클레임용 역할 스냅샷을 반환한다({@code RoleChanged} 투영 — 재발급 경로가 발급 시점에 읽는다).
+     *
+     * @throws AuthException 미존재 계정이면(404)
+     */
+    @Transactional(readOnly = true)
+    public List<String> getRoles(UUID userId) {
+        return repository
+                .findById(userId)
+                .map(AuthAccount::getRoles)
+                .orElseThrow(() -> new AuthException(AuthErrorCode.ACCOUNT_NOT_FOUND));
     }
 
     /**

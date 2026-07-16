@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 온보딩 완료의 {@code CreateUser} 명령을 수행한다 — 한 트랜잭션에서 {@code User(ACTIVE)} 생성 →
- * {@code ConsentRecord} append(+{@code ConsentState} fold) → 알림 수신 설정 초기화 →
+ * {@code ConsentRecord} append(+{@code ConsentState} fold) → 알림 수신 설정 초기화 → 기본 역할(USER) 배정 →
  * {@code CiRegistry.link}(유니크 hard-enforce) → {@code IdentityVerification} 연결을 원자 수행하고
  * {@code UserId}를 반환한다.
  *
@@ -41,6 +41,7 @@ public class UserRegistrationProcessor {
     private final UserAppender userAppender;
     private final ConsentAppender consentAppender;
     private final NotificationPreferenceAppender notificationPreferenceAppender;
+    private final UserRoleAppender userRoleAppender;
     private final CiRegistryRepository ciRegistryRepository;
 
     public UserRegistrationProcessor(
@@ -50,6 +51,7 @@ public class UserRegistrationProcessor {
             UserAppender userAppender,
             ConsentAppender consentAppender,
             NotificationPreferenceAppender notificationPreferenceAppender,
+            UserRoleAppender userRoleAppender,
             CiRegistryRepository ciRegistryRepository) {
         this.identityVerificationRepository = identityVerificationRepository;
         this.consentValidator = consentValidator;
@@ -57,6 +59,7 @@ public class UserRegistrationProcessor {
         this.userAppender = userAppender;
         this.consentAppender = consentAppender;
         this.notificationPreferenceAppender = notificationPreferenceAppender;
+        this.userRoleAppender = userRoleAppender;
         this.ciRegistryRepository = ciRegistryRepository;
     }
 
@@ -87,6 +90,7 @@ public class UserRegistrationProcessor {
         consents.forEach(
                 (type, version) -> consentAppender.append(userId, type, version, ConsentAction.AGREE, null, now));
         notificationPreferenceAppender.initialize(userId, consents.containsKey(TermsType.MARKETING));
+        userRoleAppender.assignDefault(userId, now);
         // 재가입: 쿨다운이 지난 tombstone은 행 잠금 후 재연결한다(경합의 후발 트랜잭션은 relink 가드가
         // DUPLICATE_CI로 거부). 신규 CI는 insert — 이중생성은 유니크 인덱스가 backstop.
         CiRegistry tombstone = ciRegistryRepository.findWithLockByCiHash(ciHash).orElse(null);

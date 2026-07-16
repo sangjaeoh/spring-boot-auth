@@ -43,8 +43,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class AuthFacade {
 
-    private static final List<String> DEFAULT_ROLES = List.of("USER");
-
     private final AuthAccountReader authAccountReader;
     private final AccountLockProcessor accountLockProcessor;
     private final RateLimitPolicyValidator rateLimitPolicyValidator;
@@ -141,7 +139,7 @@ public class AuthFacade {
                 now);
         messagePublisher.publish(new LoggedIn(account.userId(), session.sessionId(), now));
         String accessToken =
-                jwtIssuer.issueAccess(account.userId(), session.sessionId(), DEFAULT_ROLES, accessTtl, now);
+                jwtIssuer.issueAccess(account.userId(), session.sessionId(), account.roles(), accessTtl, now);
         return new TokenResponse(accessToken, session.refreshToken(), accessTtl.toSeconds());
     }
 
@@ -164,7 +162,9 @@ public class AuthFacade {
             case ROTATED -> {
                 UUID userId = requireNonNull(outcome.userId());
                 UUID sessionId = requireNonNull(outcome.sessionId());
-                String accessToken = jwtIssuer.issueAccess(userId, sessionId, DEFAULT_ROLES, accessTtl, now);
+                // 재발급이 역할 투영을 다시 읽는다 — RoleChanged 반영 지연의 상한이 Access TTL이 된다.
+                List<String> roles = authAccountReader.getRoles(userId);
+                String accessToken = jwtIssuer.issueAccess(userId, sessionId, roles, accessTtl, now);
                 yield new TokenResponse(accessToken, requireNonNull(outcome.refreshToken()), accessTtl.toSeconds());
             }
             case REUSE_DETECTED -> throw new AuthException(AuthErrorCode.REFRESH_TOKEN_REUSE);

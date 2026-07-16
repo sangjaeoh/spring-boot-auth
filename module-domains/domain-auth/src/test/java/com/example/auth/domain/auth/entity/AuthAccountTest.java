@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -67,6 +68,27 @@ class AuthAccountTest {
     @Test
     void unlockedAccountIsNeverExpired() {
         assertThat(account().isTemporaryLockExpired(NOW, COOLDOWN)).isFalse();
+    }
+
+    @Test
+    void createsWithDefaultUserRole() {
+        assertThat(account().getRoles()).containsExactly("USER");
+    }
+
+    @Test
+    void appliesRolesWithMonotonicOccurredAtGuard() {
+        AuthAccount account = account();
+
+        assertThat(account.applyRoles(List.of("ADMIN", "USER"), NOW)).isTrue();
+        assertThat(account.getRoles()).containsExactly("ADMIN", "USER");
+
+        // 같은 시각·과거 시각 재전달(역순 DLQ 재시도)은 무시된다.
+        assertThat(account.applyRoles(List.of("USER"), NOW)).isFalse();
+        assertThat(account.applyRoles(List.of("USER"), NOW.minusSeconds(1))).isFalse();
+        assertThat(account.getRoles()).containsExactly("ADMIN", "USER");
+
+        assertThat(account.applyRoles(List.of("USER"), NOW.plusSeconds(1))).isTrue();
+        assertThat(account.getRoles()).containsExactly("USER");
     }
 
     private AuthAccount account() {

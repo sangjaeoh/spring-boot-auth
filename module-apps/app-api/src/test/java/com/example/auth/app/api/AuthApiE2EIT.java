@@ -9,10 +9,13 @@ import com.example.auth.app.api.presentation.v1.LoginRequest;
 import com.example.auth.app.api.presentation.v1.MeResponse;
 import com.example.auth.app.api.presentation.v1.RefreshRequest;
 import com.example.auth.app.api.presentation.v1.TokenResponse;
+import com.example.auth.domain.auth.service.AuthAccountModifier;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.SignedJWT;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,6 +67,9 @@ class AuthApiE2EIT {
 
     @Autowired
     private AccountProvisioningFacade provisioning;
+
+    @Autowired
+    private AuthAccountModifier authAccountModifier;
 
     @Test
     void loginAuthenticatedRequestThenLogoutRevokesImmediately() {
@@ -153,6 +159,26 @@ class AuthApiE2EIT {
                 .build()
                 .decode(tokens.accessToken());
         assertThat(decoded.getSubject()).isEqualTo(userId.toString());
+    }
+
+    @Test
+    void accessTokenRolesClaimFollowsRoleProjectionOnReissue() throws Exception {
+        UUID userId = provisioning.provision("erin@example.com", "secret123");
+        TokenResponse tokens = login("erin@example.com", "secret123");
+        assertThat(rolesClaim(tokens.accessToken())).containsExactly("USER");
+
+        // RoleChanged 소비가 갱신하는 roles 투영을 직접 반영한다(발행측 관리자 API는 app-admin 소유).
+        // 재발급 시 반영 결정: 새 Access부터 새 역할, 기존 Access는 TTL까지 이전 역할.
+        authAccountModifier.applyRoles(userId, List.of("ADMIN", "USER"), Instant.now());
+
+        ResponseEntity<TokenResponse> rotated = rest.postForEntity(
+                "/auth/token/refresh", new RefreshRequest(tokens.refreshToken()), TokenResponse.class);
+        assertThat(rotated.getStatusCode().value()).isEqualTo(200);
+        assertThat(rolesClaim(requireNonNull(rotated.getBody()).accessToken())).containsExactly("ADMIN", "USER");
+    }
+
+    private static List<String> rolesClaim(String accessToken) throws Exception {
+        return SignedJWT.parse(accessToken).getJWTClaimsSet().getStringListClaim("roles");
     }
 
     private TokenResponse login(String email, String password) {

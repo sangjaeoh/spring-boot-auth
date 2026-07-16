@@ -3,6 +3,7 @@ package com.example.auth.domain.auth.info;
 import com.example.auth.domain.auth.entity.AuthAccount;
 import com.example.auth.domain.auth.entity.FailureReason;
 import com.example.auth.domain.auth.entity.LifecycleStatus;
+import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
@@ -11,9 +12,14 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>{@code loginAllowed}가 false면 {@code blockReason}에 사유가 담긴다(이력 기록용 — 클라이언트 응답은
  * 사유를 구분하지 않되, 휴면({@code dormant})만 자격 검증 성공자에게 해제 안내를 노출한다).
+ * {@code roles}는 토큰 클레임 발급용 역할 스냅샷이다.
  */
 public record LoginAccountInfo(
-        UUID userId, boolean loginAllowed, @Nullable FailureReason blockReason, boolean dormant) {
+        UUID userId, boolean loginAllowed, @Nullable FailureReason blockReason, boolean dormant, List<String> roles) {
+
+    public LoginAccountInfo {
+        roles = List.copyOf(roles);
+    }
 
     public static LoginAccountInfo from(AuthAccount account) {
         FailureReason blockReason = account.isLoginAllowed()
@@ -23,6 +29,7 @@ public record LoginAccountInfo(
                 account.getUserId(),
                 account.isLoginAllowed(),
                 blockReason,
-                account.getUserStatus() == LifecycleStatus.DORMANT);
+                account.getUserStatus() == LifecycleStatus.DORMANT,
+                account.getRoles());
     }
 }

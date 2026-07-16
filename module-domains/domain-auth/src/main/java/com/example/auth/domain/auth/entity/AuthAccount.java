@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
@@ -22,10 +23,15 @@ import org.jspecify.annotations.Nullable;
  * {@code userStatusVersion}으로 순서 역전 없이 멱등 반영한다. 탈퇴 반영 시 {@code loginEmail}을
  * 파기(null)해 식별자를 해제한다 — 유니크 인덱스는 null을 제외하므로 재가입이 같은 이메일을 쓸 수 있다.
  * 잠금 오버레이({@code lockState})는 생명주기와 직교하며 일시 잠금은 쿨다운 경과 시 해제된다.
+ * {@code roles}는 유저의 역할 배정 투영(토큰 클레임의 원천)으로 {@code RoleChanged} 소비
+ * ({@code applyRoles})로만 갱신된다.
  */
 @Entity
 @Table(schema = "auth", name = "auth_account")
 public class AuthAccount extends BaseTimeEntity<UUID> {
+
+    private static final String DEFAULT_ROLE = "USER";
+    private static final String ROLE_DELIMITER = ",";
 
     @Id
     @Column(name = "user_id")
@@ -56,6 +62,13 @@ public class AuthAccount extends BaseTimeEntity<UUID> {
     @Column(name = "user_status_version")
     private long userStatusVersion;
 
+    @Column(name = "roles", length = 200)
+    private String roles;
+
+    @Column(name = "roles_applied_at")
+    @Nullable
+    private Instant rolesAppliedAt;
+
     protected AuthAccount() {}
 
     private AuthAccount(UUID userId, Email loginEmail) {
@@ -64,6 +77,7 @@ public class AuthAccount extends BaseTimeEntity<UUID> {
         this.lockState = LockState.NONE;
         this.userStatus = LifecycleStatus.ACTIVE;
         this.userStatusVersion = 0;
+        this.roles = DEFAULT_ROLE;
     }
 
     /**
@@ -121,6 +135,19 @@ public class AuthAccount extends BaseTimeEntity<UUID> {
     }
 
     /**
+     * 유저의 역할 배정 스냅샷을 반영한다 — 제시 시각이 마지막 반영 시각 이후일 때만 갱신하고(역순 재전달
+     * 흡수·멱등), 반영 여부를 반환한다. 토큰 roles 클레임은 이 투영에서 발급 시점에 채워진다.
+     */
+    public boolean applyRoles(List<String> roleNames, Instant occurredAt) {
+        if (rolesAppliedAt != null && !occurredAt.isAfter(rolesAppliedAt)) {
+            return false;
+        }
+        this.roles = String.join(ROLE_DELIMITER, roleNames);
+        this.rolesAppliedAt = occurredAt;
+        return true;
+    }
+
+    /**
      * 유저 생명주기 스냅샷을 반영한다 — 제시 버전이 현재보다 클 때만 갱신하고(순서 역전 방지·멱등),
      * 반영 여부를 반환한다. WITHDRAWN 반영은 {@code loginEmail}을 함께 파기한다(식별자 해제 + PII 파기).
      */
@@ -167,5 +194,9 @@ public class AuthAccount extends BaseTimeEntity<UUID> {
 
     public long getUserStatusVersion() {
         return userStatusVersion;
+    }
+
+    public List<String> getRoles() {
+        return roles.isEmpty() ? List.of() : List.of(roles.split(ROLE_DELIMITER, -1));
     }
 }

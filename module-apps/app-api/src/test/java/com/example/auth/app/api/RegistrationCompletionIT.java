@@ -93,6 +93,13 @@ class RegistrationCompletionIT {
                 .isEqualTo(1);
         assertThat(count("select count(*) from auth.password_credential where user_id = ?", userId))
                 .isEqualTo(1);
+        // 가입 시 USER 기본 역할이 같은 트랜잭션에서 배정된다(RBAC).
+        assertThat(jdbc.queryForObject(
+                        "select r.name from usr.user_role ur join usr.role r on r.id = ur.role_id"
+                                + " where ur.user_id = ?",
+                        String.class,
+                        userId))
+                .isEqualTo("USER");
 
         // 멱등 재실행(커밋 후 세션 소비 실패 창의 재요청) — 신규 쓰기 없이 같은 UserId를 재반환한다.
         UUID replayed = accountRegistrationProcessor.register(completion, "secret123");
