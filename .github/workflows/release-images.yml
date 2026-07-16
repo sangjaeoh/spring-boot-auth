@@ -3,9 +3,12 @@
 # 배포(롤아웃 순서·카나리)는 docs/ops/deployment.md 규약을 따른다.
 name: release-images
 
+# 자동 실행 비활성화(솔로 레포라 CI 불필요) — 태그 푸시 트리거를 껐다. 되살리려면 아래 주석을 푼다.
+# on:
+#   push:
+#     tags: ["v*"]
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch: # 수동 실행만 허용(자동 실행 없음)
 
 permissions:
   contents: read
@@ -18,13 +21,13 @@ jobs:
       matrix:
         app: [app-api, app-admin, app-batch, app-migration]
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           build-args: APP=${{ matrix.app }}
