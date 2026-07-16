@@ -1,5 +1,7 @@
 package com.example.auth.infra.redis;
 
+import com.example.auth.domain.auth.exception.AuthErrorCode;
+import com.example.auth.domain.auth.exception.AuthException;
 import com.example.auth.domain.auth.port.VerificationChallengeStore;
 import com.example.auth.domain.auth.port.VerificationResult;
 import java.time.Duration;
@@ -18,7 +20,8 @@ import org.springframework.stereotype.Component;
  * Redis 기반 인증코드 스토어다(TTL). 검증은 Lua로 원자 판정한다.
  *
  * <p>존재·시도상한·코드대조·시도증가·소진을 한 번의 Lua로 수행해 저엔트로피 코드의 시도상한 우회(병렬 추측)를
- * 막는다. 저장소 예외는 fail-closed(NOT_FOUND)로 처리해 검증 불가 시 재설정이 진행되지 않게 한다.
+ * 막는다. 저장소 예외는 검증은 fail-closed(NOT_FOUND)로 처리해 재설정이 진행되지 않게 하고, 발급은 다른 쓰기
+ * 경로와 같이 {@link AuthErrorCode#SESSION_STORE_UNAVAILABLE}(503)로 실패시켜 장애를 정직하게 알린다.
  */
 @Component
 public class RedisVerificationChallengeStore implements VerificationChallengeStore {
@@ -47,8 +50,13 @@ public class RedisVerificationChallengeStore implements VerificationChallengeSto
                 "0",
                 "maxAttempts",
                 Integer.toString(maxAttempts));
-        redis.<String, String>opsForHash().putAll(key, fields);
-        redis.expire(key, ttl);
+        try {
+            redis.<String, String>opsForHash().putAll(key, fields);
+            redis.expire(key, ttl);
+        } catch (DataAccessException e) {
+            log.warn("인증코드 발급 중 Redis 예외 — fail-closed(503)", e);
+            throw new AuthException(AuthErrorCode.SESSION_STORE_UNAVAILABLE);
+        }
     }
 
     @Override
