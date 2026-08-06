@@ -9,7 +9,7 @@ palantir-java-format = "2.94.0"
 errorprone-plugin = "5.1.0"
 errorprone = "2.50.0"
 nullaway = "0.13.7"
-jspecify = "1.0.0"
+jspecify = "1.0.1"
 archunit = "1.4.2"
 # BouncyCastle는 Argon2PasswordEncoder의 런타임 필수이나 spring-security-crypto의 optional 의존이라
 # 전이되지 않고 Spring Boot BOM도 관리하지 않는다 → 여기서 명시 pin(code-quality.md: 버전 리터럴 금지).
