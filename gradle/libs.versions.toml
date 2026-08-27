@@ -3,7 +3,7 @@
 
 [versions]
 java = "25"
-spring-boot = "4.1.0"
+spring-boot = "4.1.1"
 spotless = "8.8.0"
 palantir-java-format = "2.94.0"
 errorprone-plugin = "5.1.0"
