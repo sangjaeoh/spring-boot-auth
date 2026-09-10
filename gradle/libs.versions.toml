@@ -15,7 +15,7 @@ archunit = "1.4.2"
 # 전이되지 않고 Spring Boot BOM도 관리하지 않는다 → 여기서 명시 pin(code-quality.md: 버전 리터럴 금지).
 bouncycastle = "1.85"
 # springdoc 3.x가 Spring Boot 4 대응 라인이다(2.x는 Boot 3 전용).
-springdoc = "3.0.3"
+springdoc = "3.1.1"
 
 [libraries]
 # BOM (Gradle 네이티브 platform로 임포트)
